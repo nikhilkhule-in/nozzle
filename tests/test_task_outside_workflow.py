@@ -6,12 +6,11 @@ def simple_task():
     return "Task completed"
 
 
-def test_simple_workflow():
+def test_task_outside_workflow():
     @workflow
-    def simple_workflow():
-
+    def task_outside_workflow():
         simple_task()
 
-    assert len(simple_workflow.queue) == 1
-    results = simple_workflow()
+    assert len(task_outside_workflow.queue) == 1
+    results = task_outside_workflow()
     assert results == ["Task completed"]
