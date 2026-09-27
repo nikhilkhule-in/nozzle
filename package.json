@@ -1,0 +1,43 @@
+{
+    "name": "nozzle",
+    "version": "0.1.0",
+    "description": "Simple workflows-as-code engine in Python.",
+    "homepage": "https://github.com/nikhilkhule-in/nozzle#readme",
+    "bugs": {
+        "url": "https://github.com/nikhilkhule-in/nozzle/issues"
+    },
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/nikhilkhule-in/nozzle.git"
+    },
+    "type": "module",
+    "directories": {
+        "test": "tests"
+    },
+    "workspaces": [
+        "apps/*",
+        "packages/*"
+    ],
+    "scripts": {
+        "format": "turbo run format"
+    },
+    "devDependencies": {
+        "prettier": "^3.9.9",
+        "turbo": "^2.11.4"
+    },
+    "devEngines": {
+        "packageManager": {
+            "name": "npm",
+            "version": "12.1.0"
+        }
+    },
+    "prettier": {
+        "tabWidth": 4,
+        "singleQuote": false,
+        "singleAttributePerLine": true
+    },
+    "allowScripts": {
+        "esbuild": true,
+        "workerd": true
+    }
+}

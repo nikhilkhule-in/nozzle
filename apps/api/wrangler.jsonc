@@ -1,0 +1,32 @@
+{
+    "$schema": "node_modules/wrangler/config-schema.json",
+    "name": "api",
+    "main": "src/index.ts",
+    "compatibility_date": "2026-09-26",
+    "compatibility_flags": ["nodejs_compat"],
+    "observability": {
+        "enabled": true,
+    },
+    "containers": [
+        {
+            "class_name": "NozzleContainer",
+            "image": "../../packages/nozzle/Dockerfile",
+            "max_instances": 10,
+        },
+    ],
+    "durable_objects": {
+        "bindings": [
+            {
+                "class_name": "NozzleContainer",
+                "name": "NOZZLECONTAINER",
+            },
+        ],
+    },
+    "migrations": [
+        {
+            "new_sqlite_classes": ["NozzleContainer"],
+            "tag": "v1",
+        },
+    ],
+    "upload_source_maps": true,
+}

@@ -1,0 +1,28 @@
+[project]
+name = "nozzle"
+version = "0.1.0"
+description = "Add your description here"
+# readme = "README.md"
+authors = [
+    { name = "Nikhil Khule", email = "224297050+n-khule@users.noreply.github.com" }
+]
+requires-python = ">=3.12"
+dependencies = []
+
+[project.optional-dependencies]
+server = [
+    "fastapi[standard]>=0.115",
+    "uvicorn>=0.30",
+]
+
+[project.scripts]
+nozzle-new = "nozzle_new:main"
+
+[build-system]
+requires = ["uv_build>=0.12.15,<0.13.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "ruff>=0.16.9",
+]
