@@ -1,0 +1,420 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Nozzle Orchestrator API",
+    "version": "0.1.0",
+    "description": "Portable orchestrator/worker contract. Every provider implementation (local, Cloudflare, future) codes against this file. Workers poll; the orchestrator never dials out."
+  },
+  "paths": {
+    "/workflows": {
+      "get": {
+        "operationId": "listWorkflows",
+        "summary": "List registered workflows",
+        "responses": {
+          "200": {
+            "description": "Workflows",
+            "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Workflow" } } } }
+          }
+        }
+      },
+      "post": {
+        "operationId": "registerWorkflow",
+        "summary": "Register a workflow definition",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/WorkflowRegister" } } } },
+        "responses": {
+          "201": {
+            "description": "Registered workflow",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Workflow" } } }
+          },
+          "400": { "description": "Validation error", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      }
+    },
+    "/workflows/{workflow_id}": {
+      "get": {
+        "operationId": "getWorkflow",
+        "summary": "Read a workflow definition",
+        "parameters": [{ "name": "workflow_id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": {
+          "200": { "description": "Workflow", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Workflow" } } } },
+          "404": { "description": "Unknown workflow", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      }
+    },
+    "/workflows/{workflow_id}/runs": {
+      "get": {
+        "operationId": "listRunsOfWorkflow",
+        "summary": "List runs belonging to a workflow",
+        "parameters": [{ "name": "workflow_id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": {
+          "200": {
+            "description": "Runs",
+            "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Run" } } } }
+          }
+        }
+      }
+    },
+    "/runs": {
+      "post": {
+        "operationId": "createRun",
+        "summary": "Manually trigger a run (pins bundle version, expands tasks)",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RunCreate" } } } },
+        "responses": {
+          "201": { "description": "Queued run", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Run" } } } },
+          "404": { "description": "Unknown workflow", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      }
+    },
+    "/runs/{run_id}": {
+      "get": {
+        "operationId": "getRun",
+        "summary": "Read run status with per-task states",
+        "parameters": [{ "name": "run_id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": {
+          "200": { "description": "Run detail", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RunDetail" } } } },
+          "404": { "description": "Unknown run", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      }
+    },
+    "/workers/register": {
+      "post": {
+        "operationId": "registerWorker",
+        "summary": "Register a worker (setup already ensured worker-side)",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/WorkerRegister" } } } },
+        "responses": {
+          "200": { "description": "Registration verdict", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/WorkerRegistration" } } } }
+        }
+      }
+    },
+    "/tasks/claim": {
+      "post": {
+        "operationId": "claimTask",
+        "summary": "Short-poll for the next ready task",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/TaskClaim" } } } },
+        "responses": {
+          "200": { "description": "Assignment", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Assignment" } } } },
+          "204": { "description": "No work available" },
+          "403": { "description": "Unpaired provider network or language", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      }
+    },
+    "/tasks/{task_id}/heartbeat": {
+      "post": {
+        "operationId": "heartbeatTask",
+        "summary": "Renew a task lease",
+        "parameters": [{ "name": "task_id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Heartbeat" } } } },
+        "responses": {
+          "200": { "description": "Lease state", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Lease" } } } },
+          "409": { "description": "Lease lost or foreign owner", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      }
+    },
+    "/tasks/{task_id}/complete": {
+      "post": {
+        "operationId": "completeTask",
+        "summary": "Report attempt completion with output envelope",
+        "parameters": [{ "name": "task_id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/TaskComplete" } } } },
+        "responses": {
+          "200": { "description": "Accepted (idempotent per attempt)", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Ack" } } } },
+          "409": { "description": "Foreign lease owner", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      }
+    },
+    "/tasks/{task_id}/fail": {
+      "post": {
+        "operationId": "failTask",
+        "summary": "Report attempt failure with error text",
+        "parameters": [{ "name": "task_id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/TaskFail" } } } },
+        "responses": {
+          "200": { "description": "Accepted; includes retry verdict", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/FailVerdict" } } } },
+          "409": { "description": "Foreign lease owner", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      }
+    },
+    "/tasks/{task_id}/blob": {
+      "post": {
+        "operationId": "uploadBlob",
+        "summary": "Upload large output bytes through the orchestrator",
+        "parameters": [{ "name": "task_id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/BlobUpload" } } } },
+        "responses": {
+          "201": { "description": "Stored blob reference", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/BlobRef" } } } },
+          "400": { "description": "Hash mismatch or oversize", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      }
+    },
+    "/blobs/{key}": {
+      "get": {
+        "operationId": "fetchBlob",
+        "summary": "Fetch blob bytes by key",
+        "parameters": [{ "name": "key", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": {
+          "200": { "description": "Raw bytes", "content": { "application/octet-stream": { "schema": { "type": "string", "format": "binary" } } } },
+          "404": { "description": "Unknown key", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      }
+    },
+    "/runs/{run_id}/tasks/{task_id}/logs": {
+      "post": {
+        "operationId": "writeLogs",
+        "summary": "Write the single final log blob for an attempt",
+        "parameters": [
+          { "name": "run_id", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "task_id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/LogWrite" } } } },
+        "responses": {
+          "201": { "description": "Stored", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Ack" } } } },
+          "409": { "description": "Log blob already present for attempt", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      },
+      "get": {
+        "operationId": "readLogs",
+        "summary": "Read the final log blob for a task (latest attempt by default)",
+        "parameters": [
+          { "name": "run_id", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "task_id", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "attempt", "in": "query", "required": false, "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": { "description": "Log text", "content": { "text/plain": { "schema": { "type": "string" } } } },
+          "404": { "description": "No log blob yet", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "WorkflowRegister": {
+        "type": "object",
+        "required": ["id", "language", "bundle", "dag"],
+        "properties": {
+          "id": { "type": "string" },
+          "language": { "type": "string", "example": "python" },
+          "bundle": { "type": "string", "description": "Bundle name from orchestrator-side config" },
+          "dag": { "$ref": "#/components/schemas/Dag" }
+        }
+      },
+      "Workflow": {
+        "type": "object",
+        "required": ["id", "language", "bundle", "dag"],
+        "properties": {
+          "id": { "type": "string" },
+          "language": { "type": "string" },
+          "bundle": { "type": "string" },
+          "dag": { "$ref": "#/components/schemas/Dag" }
+        }
+      },
+      "Dag": {
+        "type": "object",
+        "required": ["tasks", "edges"],
+        "properties": {
+          "tasks": { "type": "array", "items": { "$ref": "#/components/schemas/TaskSpec" } },
+          "edges": { "type": "array", "items": { "$ref": "#/components/schemas/Edge" } }
+        }
+      },
+      "TaskSpec": {
+        "type": "object",
+        "required": ["name", "runtime"],
+        "properties": {
+          "name": { "type": "string" },
+          "runtime": { "type": "string" }
+        }
+      },
+      "Edge": {
+        "type": "object",
+        "required": ["upstream", "downstream", "arg"],
+        "properties": {
+          "upstream": { "type": "string" },
+          "downstream": { "type": "string" },
+          "arg": { "type": "string" },
+          "predicate": { "$ref": "#/components/schemas/Predicate" }
+        }
+      },
+      "Predicate": {
+        "type": "object",
+        "required": ["op", "value"],
+        "properties": {
+          "op": { "type": "string", "enum": ["equals", "not_equals"] },
+          "value": { "description": "JSON scalar (string, number, boolean)" }
+        }
+      },
+      "RunCreate": {
+        "type": "object",
+        "required": ["workflow_id", "inputs"],
+        "properties": {
+          "workflow_id": { "type": "string" },
+          "inputs": { "type": "object", "description": "JSON inputs for entry tasks" }
+        }
+      },
+      "Run": {
+        "type": "object",
+        "required": ["id", "workflow_id", "status", "bundle_version"],
+        "properties": {
+          "id": { "type": "string" },
+          "workflow_id": { "type": "string" },
+          "status": { "type": "string", "enum": ["queued", "running", "succeeded", "failed"] },
+          "bundle_version": { "type": "string" },
+          "created_at": { "type": "string" },
+          "started_at": { "type": "string" },
+          "finished_at": { "type": "string" }
+        }
+      },
+      "TaskRecord": {
+        "type": "object",
+        "required": ["id", "run_id", "name", "status", "attempt"],
+        "properties": {
+          "id": { "type": "string" },
+          "run_id": { "type": "string" },
+          "name": { "type": "string" },
+          "status": { "type": "string", "enum": ["queued", "running", "succeeded", "failed", "skipped"] },
+          "attempt": { "type": "integer" },
+          "lease_owner": { "type": "string" },
+          "lease_expires_at": { "type": "string" },
+          "error": { "type": "string" },
+          "output": { "$ref": "#/components/schemas/Envelope" }
+        }
+      },
+      "RunDetail": {
+        "allOf": [
+          { "$ref": "#/components/schemas/Run" },
+          { "type": "object", "required": ["tasks"], "properties": { "tasks": { "type": "array", "items": { "$ref": "#/components/schemas/TaskRecord" } } } }
+        ]
+      },
+      "Envelope": {
+        "type": "object",
+        "required": ["type", "codec", "size", "sha256"],
+        "properties": {
+          "type": { "type": "string", "enum": ["inline", "blob"] },
+          "codec": { "type": "string", "example": "msgpack" },
+          "size": { "type": "integer" },
+          "sha256": { "type": "string" },
+          "value": { "description": "Present when type is inline: decoded JSON value" },
+          "blob": { "$ref": "#/components/schemas/BlobRef" }
+        }
+      },
+      "BlobRef": {
+        "type": "object",
+        "required": ["backend", "key", "size", "sha256"],
+        "properties": {
+          "backend": { "type": "string" },
+          "key": { "type": "string" },
+          "size": { "type": "integer" },
+          "sha256": { "type": "string" }
+        }
+      },
+      "WorkerRegister": {
+        "type": "object",
+        "required": ["language", "runtime", "core_version"],
+        "properties": {
+          "worker_id": { "type": "string" },
+          "language": { "type": "string" },
+          "runtime": { "type": "string" },
+          "core_version": { "type": "string" }
+        }
+      },
+      "WorkerRegistration": {
+        "type": "object",
+        "required": ["worker_id", "verdict"],
+        "properties": {
+          "worker_id": { "type": "string" },
+          "verdict": { "type": "string", "enum": ["accepted", "needs_setup_retry", "rejected"] },
+          "reason": { "type": "string" }
+        }
+      },
+      "TaskClaim": {
+        "type": "object",
+        "required": ["worker_id", "language", "runtime"],
+        "properties": {
+          "worker_id": { "type": "string" },
+          "language": { "type": "string" },
+          "runtime": { "type": "string" }
+        }
+      },
+      "Assignment": {
+        "type": "object",
+        "required": ["run_id", "task_id", "task_name", "attempt", "inputs", "bundle_version", "lease_expires_at"],
+        "properties": {
+          "run_id": { "type": "string" },
+          "task_id": { "type": "string" },
+          "task_name": { "type": "string" },
+          "attempt": { "type": "integer" },
+          "inputs": { "type": "object", "description": "arg name to Envelope", "additionalProperties": { "$ref": "#/components/schemas/Envelope" } },
+          "bundle_version": { "type": "string" },
+          "lease_expires_at": { "type": "string" }
+        }
+      },
+      "Heartbeat": {
+        "type": "object",
+        "required": ["worker_id"],
+        "properties": { "worker_id": { "type": "string" } }
+      },
+      "Lease": {
+        "type": "object",
+        "required": ["task_id", "lease_owner", "lease_expires_at"],
+        "properties": {
+          "task_id": { "type": "string" },
+          "lease_owner": { "type": "string" },
+          "lease_expires_at": { "type": "string" }
+        }
+      },
+      "TaskComplete": {
+        "type": "object",
+        "required": ["worker_id", "attempt", "envelope"],
+        "properties": {
+          "worker_id": { "type": "string" },
+          "attempt": { "type": "integer" },
+          "envelope": { "$ref": "#/components/schemas/Envelope" }
+        }
+      },
+      "TaskFail": {
+        "type": "object",
+        "required": ["worker_id", "attempt", "error"],
+        "properties": {
+          "worker_id": { "type": "string" },
+          "attempt": { "type": "integer" },
+          "error": { "type": "string" }
+        }
+      },
+      "FailVerdict": {
+        "type": "object",
+        "required": ["retry"],
+        "properties": {
+          "retry": { "type": "boolean" },
+          "next_attempt": { "type": "integer" }
+        }
+      },
+      "BlobUpload": {
+        "type": "object",
+        "required": ["worker_id", "attempt", "sha256", "content_base64"],
+        "properties": {
+          "worker_id": { "type": "string" },
+          "attempt": { "type": "integer" },
+          "sha256": { "type": "string" },
+          "content_base64": { "type": "string" }
+        }
+      },
+      "LogWrite": {
+        "type": "object",
+        "required": ["attempt", "content"],
+        "properties": {
+          "attempt": { "type": "integer" },
+          "content": { "type": "string" }
+        }
+      },
+      "Ack": {
+        "type": "object",
+        "required": ["ok"],
+        "properties": { "ok": { "type": "boolean" } }
+      },
+      "Error": {
+        "type": "object",
+        "required": ["message"],
+        "properties": { "message": { "type": "string" } }
+      }
+    }
+  }
+}
