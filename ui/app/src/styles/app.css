@@ -1,0 +1,100 @@
+@import 'tailwindcss' source('../');
+
+@theme inline {
+  --font-sans: 'Inter', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+}
+
+:root {
+  --background: #0f1115;
+  --foreground: #e6e9ef;
+  --card: #171b22;
+  --card-foreground: #e6e9ef;
+  --muted: #9aa3b2;
+  --border: #2a3140;
+  --primary: #4f8cff;
+  --primary-foreground: #ffffff;
+  --ok: #3fb950;
+  --running: #d29922;
+  --failed: #f85149;
+  --skipped: #6e7681;
+  --radius: 0.5rem;
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+  body {
+    background: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    font-size: 14px;
+    margin: 0;
+  }
+}
+
+@layer components {
+  .app {
+    display: flex;
+    height: 100vh;
+  }
+  .sidebar {
+    width: 220px;
+    flex: none;
+    border-right: 1px solid var(--border);
+    background: #12151c;
+    padding: 14px 10px;
+    display: flex;
+    flex-direction: column;
+  }
+  .brand {
+    font-size: 16px;
+    font-weight: 700;
+    margin: 0 6px 14px;
+  }
+  .sidebar nav {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .sidebar nav a {
+    color: var(--muted);
+    text-decoration: none;
+    padding: 9px 10px;
+    border-radius: 6px;
+  }
+  .sidebar nav a:hover {
+    background: #1a2030;
+    color: var(--foreground);
+  }
+  .sidebar nav a.active {
+    background: #1d2532;
+    color: var(--primary);
+  }
+  .sidebar .foot {
+    margin-top: auto;
+    font-size: 11px;
+    color: var(--muted);
+    padding: 6px;
+  }
+  main {
+    flex: 1;
+    padding: 12px;
+    overflow: auto;
+    min-width: 0;
+  }
+  section h2 {
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+  }
+  .muted {
+    color: var(--muted);
+  }
+  code,
+  pre {
+    font-family: var(--font-mono);
+  }
+}

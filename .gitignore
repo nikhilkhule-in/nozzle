@@ -26,3 +26,8 @@ node_modules/
 worker/cloudflare/image/dist/
 worker/cloudflare/image/nozzle_worker/
 worker/cloudflare/image/bundle/
+
+# UI build output
+ui/dist/
+ui/app/dist/
+ui/app/src/routeTree.gen.ts

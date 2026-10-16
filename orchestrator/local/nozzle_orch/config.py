@@ -17,6 +17,7 @@ class Knobs:
     db_path: str = "nozzle.db"
     blob_dir: str = "blobs"
     log_dir: str = "logs"
+    ui_dist: str = ""
     bundles: tuple = ()
 
 

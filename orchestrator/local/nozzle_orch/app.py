@@ -7,12 +7,24 @@ import os
 from datetime import datetime, timezone
 
 from fastapi import FastAPI, HTTPException, Response
-from fastapi.responses import PlainTextResponse
+from fastapi.responses import FileResponse, PlainTextResponse
+from fastapi.staticfiles import StaticFiles
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from nozzle_orch import bundles as bundle_mod
 from nozzle_orch import config as config_mod
 from nozzle_orch.store import SQLiteStore
 from shared.errors import LeaseLost, NotFound, StoreError
+
+
+class SPAStatic(StaticFiles):
+    """Serve the console shell for any /app/* path without a file."""
+
+    async def get_response(self, path, scope):
+        try:
+            return await super().get_response(path, scope)
+        except (StarletteHTTPException, FileNotFoundError, RuntimeError):
+            return FileResponse(os.path.join(str(self.directory), "_shell.html"))
 
 
 def _iso(epoch):
@@ -31,6 +43,10 @@ def create_app(config_path=None, store=None):
     app = FastAPI(title="Nozzle Orchestrator (local)")
     app.state.store = owned
     app.state.knobs = knobs
+
+    if knobs.ui_dist:
+        app.mount("/app", SPAStatic(directory=os.path.join(knobs.ui_dist, "app")),
+                  name="console")
 
     def _err(e):
         if isinstance(e, LeaseLost):
