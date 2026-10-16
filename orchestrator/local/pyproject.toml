@@ -16,5 +16,8 @@ dev = [
     "pytest>=9.1.1",
 ]
 
+[tool.uv.sources]
+nozzle = { path = "../../sdk/python" }
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
