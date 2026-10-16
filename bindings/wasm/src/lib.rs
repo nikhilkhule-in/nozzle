@@ -1,4 +1,5 @@
 //! wasm-bindgen surface over the Rust core for TypeScript consumers
+<<<<<<< HEAD
 //! (future JS/TS SDKs).
 //!
 //! Mirrors the PyO3 surface exactly: JSON-in/JSON-out, no logic beyond
