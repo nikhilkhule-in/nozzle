@@ -10,6 +10,7 @@ from nozzle import (
     content_hash,
     core_version,
     defaults,
+    evaluate_predicate,
     next_ready,
     task_readiness,
     validate_workflow,
@@ -68,3 +69,9 @@ def test_lockstep_version_assertion():
     assert_compat(core_version())
     with pytest.raises(ValueError, match="lockstep"):
         assert_compat("0.0.0")
+
+
+def test_evaluate_predicate_from_rust():
+    assert evaluate_predicate("true", '{"op": "equals", "value": true}') is True
+    assert evaluate_predicate("1", '{"op": "equals", "value": "1"}') is False
+    assert evaluate_predicate("2", '{"op": "not_equals", "value": 1}') is True

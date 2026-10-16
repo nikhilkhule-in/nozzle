@@ -93,6 +93,15 @@ pub fn content_hash(data: &[u8]) -> String {
 }
 
 #[wasm_bindgen]
+pub fn evaluate_predicate(output_json: &str, predicate_json: &str) -> Result<bool, JsValue> {
+    let output: serde_json::Value =
+        serde_json::from_str(output_json).map_err(|e| err(e.to_string()))?;
+    let predicate: dag::Predicate =
+        serde_json::from_str(predicate_json).map_err(|e| err(e.to_string()))?;
+    Ok(dag::evaluate_predicate(&output, &predicate))
+}
+
+#[wasm_bindgen]
 pub fn defaults() -> String {
     serde_json::to_string(&config::Defaults::default()).unwrap_or_else(|_| "{}".to_string())
 }

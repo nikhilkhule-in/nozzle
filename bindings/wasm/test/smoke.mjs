@@ -3,6 +3,7 @@ import { strict as assert } from "node:assert";
 import {
   core_version,
   assert_compat,
+  evaluate_predicate,
   validate_workflow,
   next_ready,
   task_readiness,
@@ -38,6 +39,8 @@ assert.deepEqual(JSON.parse(next_ready(tasks, edges)), ["t_yes"]);
 assert.equal(task_readiness("t_no", tasks, edges), "should_skip");
 assert.equal(classify_output(10n, "auto", 64n), "inline");
 assert.equal(classify_output(64n, "auto", 64n), "blob");
+assert.equal(evaluate_predicate("true", JSON.stringify({ op: "equals", value: true })), true);
+assert.equal(evaluate_predicate("1", JSON.stringify({ op: "equals", value: "1" })), false);
 assert.equal(Object.keys(JSON.parse(defaults())).length, 6);
 
 assert_compat(core_version());

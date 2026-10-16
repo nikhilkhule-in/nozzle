@@ -60,8 +60,7 @@ fn next_ready(tasks_json: &str, edges_json: &str) -> PyResult<String> {
 }
 
 #[pyfunction]
-fn task_readiness(name: &str, tasks_json: &str, edges_json: &str) -> PyResult<String> {
-    let tasks: Vec<TaskOwned> = parse_tasks(tasks_json)?;
+fn task_readiness(name: &str, tasks_json: &str, edges_json: &str) -> PyResult<String> {    let tasks: Vec<TaskOwned> = parse_tasks(tasks_json)?;
     let edges: Vec<dag::Edge> =
         serde_json::from_str(edges_json).map_err(|e| value_error(e.to_string()))?;
     let views: Vec<readiness::TaskView<'_>> = tasks
@@ -80,6 +79,15 @@ fn task_readiness(name: &str, tasks_json: &str, edges_json: &str) -> PyResult<St
         readiness::Readiness::ShouldSkip => "should_skip",
     }
     .to_string())
+}
+
+#[pyfunction]
+fn evaluate_predicate(output_json: &str, predicate_json: &str) -> PyResult<bool> {
+    let output: serde_json::Value =
+        serde_json::from_str(output_json).map_err(|e| value_error(e.to_string()))?;
+    let predicate: dag::Predicate =
+        serde_json::from_str(predicate_json).map_err(|e| value_error(e.to_string()))?;
+    Ok(dag::evaluate_predicate(&output, &predicate))
 }
 
 #[pyfunction]
@@ -112,6 +120,7 @@ fn nozzle_core_ext(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(validate_workflow, m)?)?;
     m.add_function(wrap_pyfunction!(next_ready, m)?)?;
     m.add_function(wrap_pyfunction!(task_readiness, m)?)?;
+    m.add_function(wrap_pyfunction!(evaluate_predicate, m)?)?;
     m.add_function(wrap_pyfunction!(classify_output, m)?)?;
     m.add_function(wrap_pyfunction!(content_hash, m)?)?;
     m.add_function(wrap_pyfunction!(defaults, m)?)?;
