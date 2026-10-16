@@ -1,0 +1,19 @@
+{
+  "name": "nozzle-orchestrator-cloudflare",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build:wasm": "wasm-pack build ../../bindings/wasm --target web --out-dir pkg-web",
+    "dev": "wrangler dev --local",
+    "deploy": "wrangler deploy",
+    "test": "echo no-unit-tests; exit 0"
+  },
+  "dependencies": {
+    "hono": "^4.13.13"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261016.0",
+    "typescript": "^5.6.0"
+  }
+}

@@ -15,6 +15,7 @@ import pytest
 import client_gen
 
 BASE = os.environ.get("NOZZLE_API_BASE")
+BUNDLE = os.environ.get("NOZZLE_TEST_BUNDLE", "local-dev")
 
 DAG = {
     "tasks": [
@@ -47,7 +48,7 @@ def test_full_lifecycle_against_live_stack():
     assert status == 200 and reg["verdict"] == "accepted", reg
 
     status, _ = client.call("registerWorkflow", body={
-        "id": "smoke", "language": "python", "bundle": "local-dev", "dag": DAG,
+        "id": "smoke", "language": "python", "bundle": BUNDLE, "dag": DAG,
     })
     assert status in (200, 201), status
 

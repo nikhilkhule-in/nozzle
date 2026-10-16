@@ -1,0 +1,25 @@
+name = "nozzle-mvp-orchestrator"
+main = "src/index.ts"
+compatibility_date = "2025-10-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "nozzle-mvp"
+database_id = "1852b1d7-2689-4606-833e-e3a55b6b1212"
+
+[[r2_buckets]]
+binding = "STORE"
+bucket_name = "nozzle-mvp-store"
+
+[vars]
+PROVIDER = "cloudflare"
+# STORE_MODE selects the metadata backend: "d1" (implemented) or
+# "hyperdrive" (stub in MVP: every store call answers 501).
+STORE_MODE = "d1"
+# BUNDLES is a JSON list of {name, type, kwargs}; set per environment.
+# Example: [{"name":"local-dev","type":"git","url":"https://...","tracking_ref":"main"}]
+BUNDLES = "[]"
+LEASE_SECS = "60"
+MAX_ATTEMPTS = "3"
+INLINE_THRESHOLD = "65536"
+MAX_BLOB_BYTES = "10485760"
