@@ -46,6 +46,22 @@ Verified results: `nozzle-mvp-orchestrator` serves the full 15-operation
 contract on real D1+R2; a local-process worker drove run `R-3` (`cf-xnet`)
 to `succeeded` across the edge with the blob path exercised.
 
+## Web console (deployed 2026-10-16)
+
+Same `ui/dist/` bundle both stacks serve, mounted at `/app` with shell
+fallback; API stays same-origin so the bundle is never rebuilt per target.
+
+- Local: `ui_dist` knob points at `ui/dist`; `SPAStatic` serves files and
+  falls back to `app/_shell.html` for client routes.
+- Cloudflare: `npm run ui:sync` copies `ui/dist/app` to `public/app`;
+  `[assets]` with `binding = "ASSETS"` + `run_worker_first = true` lets the
+  worker route `/app/*` (exact file or shell fallback) while API paths fall
+  through to Hono. **Console URL:
+  https://nozzle-mvp-orchestrator.nikhilkhule.workers.dev/app/**
+- Verified: Playwright Chromium smoke green against both the local mount
+  and the deployed URL (seed, list, invalid-JSON block, trigger, navigate,
+  graph node, details, log panel, zero page errors).
+
 ## Edge notes
 
 - API clients must send an identifying `User-Agent`: the edge answers 1010

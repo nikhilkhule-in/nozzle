@@ -11,6 +11,12 @@ database_id = "1852b1d7-2689-4606-833e-e3a55b6b1212"
 binding = "STORE"
 bucket_name = "nozzle-mvp-store"
 
+[assets]
+directory = "./public"
+binding = "ASSETS"
+not_found_handling = "none"
+run_worker_first = true
+
 [vars]
 PROVIDER = "cloudflare"
 # STORE_MODE selects the metadata backend: "d1" (implemented) or

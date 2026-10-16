@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "build:wasm": "wasm-pack build ../../bindings/wasm --target web --out-dir pkg-web",
+    "ui:sync": "rm -rf public/app && mkdir -p public && cp -r ../../ui/dist/app public/app",
     "dev": "wrangler dev --local",
     "deploy": "wrangler deploy",
     "test": "echo no-unit-tests; exit 0"

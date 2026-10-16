@@ -5,6 +5,7 @@
 import { chromium } from '@playwright/test';
 
 const BASE = process.env.SMOKE_BASE || 'http://127.0.0.1:8003';
+const BUNDLE = process.env.SMOKE_BUNDLE || 'local-dev';
 const DAG = {
   tasks: [{ name: 't0', runtime: 'local-process' }],
   edges: [],
@@ -22,7 +23,7 @@ async function api(path, body) {
 
 const browser = await chromium.launch();
 try {
-  await api('/workflows', { id: 'smoke-ui', language: 'python', bundle: 'local-dev', dag: DAG });
+  await api('/workflows', { id: 'smoke-ui', language: 'python', bundle: BUNDLE, dag: DAG });
 
   const page = await browser.newPage();
   const errors = [];

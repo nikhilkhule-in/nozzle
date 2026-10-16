@@ -22,6 +22,15 @@ app.use("*", async (c, next) => {
   await next();
 });
 
+// Console SPA: same ui/dist bundle as local, served same-origin under /app.
+// Exact file matches win; anything else under /app falls back to the shell.
+app.get("/app", (c) => c.redirect("/app/", 302));
+app.get("/app/*", async (c) => {
+  const res = await c.env.ASSETS.fetch(c.req.raw);
+  if (res.status !== 404) return res;
+  return c.env.ASSETS.fetch(new Request(new URL("/app/_shell.html", c.req.url)));
+});
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 app.onError((err: any, c) => {  if (err instanceof LeaseLost) return c.json({ message: err.message || "lease lost" }, 409);
   if (err instanceof NotFound) return c.json({ message: err.message || "not found" }, 404);

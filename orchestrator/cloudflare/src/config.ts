@@ -1,6 +1,7 @@
 export interface Env {
   DB: D1Database;
   STORE: R2Bucket;
+  ASSETS: Fetcher;
   PROVIDER: string;
   STORE_MODE: string;
   BUNDLES: string;
