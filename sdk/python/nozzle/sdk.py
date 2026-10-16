@@ -248,6 +248,9 @@ def workflow(_func=None, *, id=None, bundle=DEFAULT_BUNDLE):
                  "tasks": spec["tasks"], "edges": spec["edges"]}))
         except ValueError as e:
             raise ValueError(f"invalid workflow {workflow_id!r}: {e}")
+        from nozzle import bundles as _bundles
+
+        _bundles.record_spec(spec)
         return spec
 
     if _func is not None:
