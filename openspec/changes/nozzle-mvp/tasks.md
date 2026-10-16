@@ -26,7 +26,7 @@ Assumption recorded (design Open Question): `orchestrator/local` HTTP is Python 
 - [x] 4.2 Add the future-truthiness guard (`bool(ref)` fails parse with branch guidance) plus `run_if` predicate helpers, and verify the conditional-workflow case models skip without executing the untaken branch
 - [x] 4.3 Implement json + binary codecs with bytes support and loud rejection of unserializable types, and verify round-trip plus rejection tests pass
 - [x] 4.4 Implement the bundle parser (workflow files to `dag_json`) with unit tests, and verify a sample project parses to schema-valid output
-- [ ] 4.5 Document SDK authoring (tasks, refs, predicates, placement hints, codecs) in `sdk/python/README.md` and verify every documented snippet runs as written
+- [x] 4.5 Document SDK authoring (tasks, refs, predicates, placement hints, codecs) in `sdk/python/README.md` and verify every documented snippet runs as written
 
 ## 5. Local stack end-to-end (reference implementation)
 
