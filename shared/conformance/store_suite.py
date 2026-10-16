@@ -9,19 +9,14 @@ readiness rules mirror `core/src/readiness.rs`.
 CORE_VERSION = "0.1.0"
 
 
+import os
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+
+from shared.errors import LeaseLost, NotFound, StoreError  # noqa: E402
+
 import pytest
-
-
-class StoreError(Exception):
-    pass
-
-
-class LeaseLost(StoreError):
-    pass
-
-
-class NotFound(StoreError):
-    pass
 
 
 def _predicate_matches(output, predicate):
@@ -35,10 +30,12 @@ def _predicate_matches(output, predicate):
 class FakeStore:
     """In-memory reference Store with an injectable clock."""
 
-    def __init__(self, provider="local", lease_secs=60, max_attempts=3, clock=None):
+    def __init__(self, provider="local", lease_secs=60, max_attempts=3, clock=None,
+                 inline_threshold=65536):
         self.provider = provider
         self.lease_secs = lease_secs
         self.max_attempts = max_attempts
+        self.inline_threshold = inline_threshold
         self._now = clock if clock is not None else [0.0]
         self.workflows = {}
         self.runs = {}
@@ -68,6 +65,7 @@ class FakeStore:
         run_id = f"R-{self._run_seq}"
         dag = self.workflows[workflow_id]["dag"]
         task_ids = {}
+        policies = dag.get("policies", {})
         for spec in dag["tasks"]:
             self._task_seq += 1
             task_id = f"T-{self._task_seq}"
@@ -76,6 +74,7 @@ class FakeStore:
                 "id": task_id, "run_id": run_id, "name": spec["name"],
                 "status": "queued", "attempt": 0, "lease_owner": None,
                 "lease_expires_at": None, "error": None, "output": None,
+                "policy": policies.get(spec["name"], "auto"),
             }
         run = {"id": run_id, "workflow_id": workflow_id, "status": "queued",
                "bundle_version": bundle_version, "tasks": list(task_ids.values())}
@@ -208,6 +207,12 @@ class FakeStore:
         task = self._owned(task_id, worker_id)
         if attempt != task["attempt"]:
             raise StoreError("stale attempt")
+        policy = task.get("policy", "auto")
+        size = envelope.get("size", 0)
+        overflow = envelope["type"] == "inline" and (
+            size >= self.inline_threshold or policy == "blob-only")
+        if overflow or (envelope["type"] == "blob" and policy == "inline-only"):
+            raise StoreError("output too large for inline; upload output first via blob endpoint")
         task["status"] = "succeeded"
         task["output"] = envelope
         task["lease_owner"] = None
@@ -392,6 +397,14 @@ def test_worker_core_mismatch_rejected(make_store):
     store = make_store()
     verdict = store.register_worker("w-old", "python", "local-process", "0.0.0")
     assert verdict["verdict"] == "rejected"
+
+
+def test_inline_overflow_rejected_to_upload(make_store):
+    store = _fresh(make_store, inline_threshold=4)
+    store.create_run("wf", {}, "v1")
+    claimed = store.claim_task("w1", "python", "local-process")
+    with pytest.raises(StoreError, match="upload"):
+        store.complete(claimed["task_id"], "w1", claimed["attempt"], INLINE)
 
 
 def test_unpaired_provider_rejected(make_store):

@@ -336,14 +336,16 @@
       },
       "Assignment": {
         "type": "object",
-        "required": ["run_id", "task_id", "task_name", "attempt", "inputs", "bundle_version", "lease_expires_at"],
+        "required": ["run_id", "task_id", "task_name", "attempt", "inputs", "bundle", "bundle_version", "code_ref", "lease_expires_at"],
         "properties": {
           "run_id": { "type": "string" },
           "task_id": { "type": "string" },
           "task_name": { "type": "string" },
           "attempt": { "type": "integer" },
           "inputs": { "type": "object", "description": "arg name to Envelope", "additionalProperties": { "$ref": "#/components/schemas/Envelope" } },
+          "bundle": { "type": "string", "description": "Bundle name; the worker resolves it through its own bundle config" },
           "bundle_version": { "type": "string" },
+          "code_ref": { "type": "string", "description": "module:qualname of the task function inside the bundle" },
           "lease_expires_at": { "type": "string" }
         }
       },
