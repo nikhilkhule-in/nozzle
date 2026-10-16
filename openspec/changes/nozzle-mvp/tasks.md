@@ -32,8 +32,8 @@ Assumption recorded (design Open Question): `orchestrator/local` HTTP is Python 
 
 - [x] 5.1 Implement `orchestrator/local` (FastAPI + SQLite store incl. per-orchestrator N default 64KB, local+git bundle config, run-pinned versions, blob/log via local filesystem) and verify the Store conformance suite passes against it
 - [x] 5.2 Implement `worker/local` (register, poll/claim, heartbeat, bundle materialize, execute by task name, envelope completion, final log blob via orchestrator) and verify a two-task linear workflow runs end-to-end locally
-- [ ] 5.3 Verify a predicate-branched workflow runs locally with the untaken branch skipped and the join task receiving available inputs
-- [ ] 5.4 Verify a large-output workflow stores a blob reference (not inline bytes) and the downstream task receives equal bytes after fetch
+- [x] 5.3 Verify a predicate-branched workflow runs locally with the untaken branch skipped and the join task receiving available inputs
+- [x] 5.4 Verify a large-output workflow stores a blob reference (not inline bytes) and the downstream task receives equal bytes after fetch
 - [ ] 5.5 Document local quickstart (`orchestrator/local` + `worker/local` + sample bundle) and verify the documented commands reproduce the end-to-end run
 
 ## 6. Cloudflare stack

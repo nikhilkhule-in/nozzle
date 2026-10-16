@@ -89,3 +89,108 @@ def test_two_task_linear_workflow_end_to_end(stack):
     tasks = {t["name"]: t["id"] for t in detail["tasks"]}
     logs = client.get(f"/runs/{run_id}/tasks/{tasks['extract']}/logs")
     assert logs.status_code == 200
+
+
+BRANCH_WF = '''
+from nozzle import task, workflow
+
+
+@task
+def check():
+    return True
+
+
+@task
+def fast(flag):
+    return "fast"
+
+
+@task
+def slow(flag):
+    return "slow"
+
+
+@task
+def join(a, b=None):
+    return [a, b]
+
+
+@workflow(id="branch_e2e", bundle="local-dev")
+def branch_e2e():
+    flag = check()
+    a = fast(flag, run_if=flag.equals(True))
+    b = slow(flag, run_if=flag.not_equals(True))
+    join(a, b)
+'''
+
+BIG_WF = '''
+from nozzle import task, workflow
+
+
+@task
+def make():
+    return "x" * 70000
+
+
+@task
+def consume(blob):
+    return len(blob)
+
+
+@workflow(id="big_e2e", bundle="local-dev")
+def big_e2e():
+    consume(make())
+'''
+
+
+def _register_and_run(client, bundle_dir, filename, source, workflow_id):
+    (bundle_dir / filename).write_text(source)
+    from nozzle.bundles import parse_file
+
+    (spec,) = parse_file(bundle_dir / filename, workflow_id=workflow_id)
+    response = client.post("/workflows", json={
+        "id": spec["id"], "language": spec["language"],
+        "bundle": "local-dev", "dag": spec})
+    assert response.status_code == 201, response.text
+    response = client.post("/runs", json={"workflow_id": workflow_id, "inputs": {}})
+    assert response.status_code == 201, response.text
+    return response.json()["id"]
+
+
+def _drive_to_terminal(worker, client, run_id, limit=100):
+    detail = None
+    for _ in range(limit):
+        worker.run_once()
+        detail = client.get(f"/runs/{run_id}").json()
+        if detail["status"] in ("succeeded", "failed"):
+            return detail
+    raise AssertionError(f"run {run_id} did not finish: {detail['status']}")
+
+
+def test_predicate_branch_skips_untaken_path(stack):
+    worker, client, bundle_dir = stack
+    assert worker.register()["verdict"] == "accepted"
+    run_id = _register_and_run(client, bundle_dir, "branch.py", BRANCH_WF, "branch_e2e")
+    detail = _drive_to_terminal(worker, client, run_id)
+    assert detail["status"] == "succeeded", detail
+    by_name = {t["name"]: t for t in detail["tasks"]}
+    assert by_name["slow"]["status"] == "skipped"
+    assert by_name["fast"]["status"] == "succeeded"
+    assert by_name["join"]["status"] == "succeeded"
+    assert by_name["join"]["output"]["value"] == ["fast", None]
+
+
+def test_large_output_travels_by_reference(stack):
+    import msgpack
+
+    worker, client, bundle_dir = stack
+    assert worker.register()["verdict"] == "accepted"
+    run_id = _register_and_run(client, bundle_dir, "big.py", BIG_WF, "big_e2e")
+    detail = _drive_to_terminal(worker, client, run_id)
+    assert detail["status"] == "succeeded", detail
+    by_name = {t["name"]: t for t in detail["tasks"]}
+    assert by_name["make"]["output"]["type"] == "blob"
+    assert by_name["consume"]["output"]["value"] == 70000
+    blob_key = by_name["make"]["output"]["blob"]["key"]
+    raw = client.get(f"/blobs/{blob_key}").content
+    assert msgpack.unpackb(raw, raw=False) == "x" * 70000
