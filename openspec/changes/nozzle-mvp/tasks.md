@@ -18,7 +18,7 @@ Assumption recorded (design Open Question): `orchestrator/local` HTTP is Python 
 
 - [ ] 3.1 Publish canonical `shared/api/openapi.json` covering every endpoint in the contract (workflows, runs, worker register, claim/heartbeat/complete/fail, blob upload, log write/read) so new provider implementations code against it, and verify it lints plus a generated client smoke-tests each operation against the local stack
 - [x] 3.2 Publish JSON Schemas for `dag_json` and the XCom envelope in `shared/schemas/`, and verify sample payloads validate against them in a test
-- [ ] 3.3 Build the Store conformance suite (atomic claim, lease expiry, idempotent complete, readiness, skipped propagation) in `shared/conformance/` and verify it runs green against an in-memory fake Store
+- [x] 3.3 Build the Store conformance suite (atomic claim, lease expiry, idempotent complete, readiness, skipped propagation) in `shared/conformance/` and verify it runs green against an in-memory fake Store
 
 ## 4. Python SDK
 
