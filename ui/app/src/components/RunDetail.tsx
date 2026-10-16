@@ -11,17 +11,17 @@ import {
 import '@xyflow/react/dist/style.css';
 
 import { Badge } from '~/components/ui/badge';
-import { Card, CardTitle } from '~/components/ui/card';
+import { Button } from '~/components/ui/button';
 import { Skeleton } from '~/components/ui/skeleton';
-import { api, type RunDetail as Run, type TaskRecord } from '~/lib/api';
-import { cn } from '~/lib/utils';
+import { TriggerRunDialog } from '~/components/TriggerRunDialog';
+import { api, type Run, type TaskRecord } from '~/lib/api';
 
-const STATUS_COLOR: Record<string, string> = {
+const NODE_COLOR: Record<string, string> = {
   succeeded: 'var(--ok)',
-  running: 'var(--running)',
-  failed: 'var(--failed)',
-  skipped: 'var(--skipped)',
-  queued: 'var(--muted)',
+  running: 'var(--rn)',
+  failed: 'var(--bd)',
+  skipped: 'var(--id)',
+  queued: 'var(--id)',
 };
 
 function layout(dag: { tasks: { name: string }[]; edges: { upstream: string; downstream: string }[] }) {
@@ -42,8 +42,7 @@ function layout(dag: { tasks: { name: string }[]; edges: { upstream: string; dow
     (layers[depth[t.name]] = layers[depth[t.name]] || []).push(t.name);
   });
   const pos: Record<string, { x: number; y: number }> = {};
-  const names = Object.keys(layers);
-  names.forEach((d) => {
+  Object.keys(layers).forEach((d) => {
     layers[+d].forEach((n, i) => {
       pos[n] = { x: +d * 230, y: i * 110 };
     });
@@ -52,17 +51,24 @@ function layout(dag: { tasks: { name: string }[]; edges: { upstream: string; dow
 }
 
 function TaskNode({ data, selected }: { data: { label: string; status: string }; selected?: boolean }) {
-  const color = STATUS_COLOR[data.status] ?? 'var(--muted)';
+  const color = NODE_COLOR[data.status] ?? 'var(--id)';
   return (
     <div
-      className={cn('rounded-lg border bg-[#10141b] px-3 py-2 text-center')}
-      style={{ borderColor: selected ? 'var(--primary)' : color, borderWidth: selected ? 2 : 1, minWidth: 150 }}
+      style={{
+        border: `1.5px solid ${selected ? 'var(--ink)' : 'var(--ln)'}`,
+        borderWidth: selected ? 3 : 1.5,
+        borderRadius: 8,
+        background: 'var(--pn)',
+        padding: '10px 14px',
+        textAlign: 'center',
+        minWidth: 150,
+        cursor: 'pointer',
+      }}
     >
       <Handle type="target" position={Position.Left} style={{ opacity: 0 }} />
-      <div className="font-mono text-xs">{data.label}</div>
-      <div className="text-[11px]" style={{ color }}>
-        {data.status}
-      </div>
+      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 500 }}>{data.label}</div>
+      <div style={{ fontSize: 10.5, color: 'var(--mu)' }}>{data.status}</div>
+      <div style={{ width: 9, height: 9, borderRadius: '50%', background: color, margin: '4px auto 0' }} />
       <Handle type="source" position={Position.Right} style={{ opacity: 0 }} />
     </div>
   );
@@ -70,15 +76,30 @@ function TaskNode({ data, selected }: { data: { label: string; status: string };
 
 const nodeTypes = { task: TaskNode };
 
-function formatOutput(task: TaskRecord) {
-  const out = task.output;
-  if (!out) return '—';
-  if (out.type === 'inline') return JSON.stringify(out.value);
-  return `${out.codec} blob ${out.blob?.size ?? '?'}B · ${out.blob?.key}`;
+function kv(label: string, value: React.ReactNode) {
+  return (
+    <div className="kv">
+      <span className="mu">{label}</span>
+      <span>{value}</span>
+    </div>
+  );
 }
 
-export function RunDetail({ runId }: { runId: string }) {
+export function RunDetail({
+  workflowId,
+  runId,
+  runs,
+  onSelectRun,
+  onBack,
+}: {
+  workflowId: string;
+  runId: string;
+  runs: Run[];
+  onSelectRun: (id: string) => void;
+  onBack: () => void;
+}) {
   const [selected, setSelected] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState<number | null>(null);
   const run = useQuery({
     queryKey: ['run', runId],
     queryFn: () => api.getRun(runId),
@@ -92,10 +113,11 @@ export function RunDetail({ runId }: { runId: string }) {
     queryFn: () => api.getWorkflow(run.data!.workflow_id),
     enabled: !!run.data,
   });
-  const task = run.data?.tasks.find((t) => t.name === selected) ?? null;
+  const task: TaskRecord | null = run.data?.tasks.find((t) => t.name === selected) ?? null;
+  const showAttempt = attempt ?? task?.attempt ?? 1;
   const logs = useQuery({
-    queryKey: ['logs', runId, task?.id],
-    queryFn: () => api.readLogs(runId, task!.id),
+    queryKey: ['logs', runId, task?.id, showAttempt],
+    queryFn: () => api.readLogs(runId, task!.id, showAttempt),
     enabled: !!task,
     retry: false,
   });
@@ -120,69 +142,161 @@ export function RunDetail({ runId }: { runId: string }) {
     return { nodes, edges };
   }, [workflow.data, run.data, selected]);
 
-  if (run.isPending || workflow.isPending) {
+  if (run.isPending) {
     return (
-      <Card>
-        <CardTitle>Run {runId}</CardTitle>
-        <Skeleton className="mt-2 h-64 w-full" />
-      </Card>
+      <div className="card">
+        <div className="ch">
+          <b className="m">{runId}</b>
+        </div>
+        <div className="sc">
+          <Skeleton className="h-64 w-full" />
+        </div>
+      </div>
     );
   }
-  if (run.isError) return <p>Failed to load run.</p>;
+  if (run.isError) return <p className="mu">Failed to load run.</p>;
+  const detail = run.data;
+  const done = detail.tasks.filter((t) => t.status === 'succeeded').length;
+  const retries = detail.tasks.reduce((n, t) => n + Math.max(0, t.attempt - 1), 0);
+  const events = detail.tasks.filter((t) => t.attempt > 1 || t.error || t.status === 'failed');
 
   return (
-    <div className="grid gap-3">
-      <Card>
-        <CardTitle>
-          Run {run.data.id} <Badge status={run.data.status}>{run.data.status}</Badge>
-        </CardTitle>
-        <p className="muted font-mono text-xs">bundle {run.data.bundle_version}</p>
-        <div style={{ height: 380 }} className="mt-2 rounded-md border border-[var(--border)] bg-[#10141b]">
-          <ReactFlow
-            nodes={nodes}
-            edges={edges}
-            nodeTypes={nodeTypes}
-            onNodeClick={(_, node) => setSelected(node.id)}
-            fitView
-            proOptions={{ hideAttribution: true }}
-          >
-            <Background gap={24} size={1} />
-          </ReactFlow>
+    <>
+      <div className="card">
+        <div className="ch">
+          <Button variant="secondary" onClick={onBack}>
+            All workflows
+          </Button>
+          <span className="mu">
+            {workflowId} · bundle {detail.bundle_version}
+          </span>
+          <span style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+            <TriggerRunDialog preset={workflowId} />
+          </span>
         </div>
-      </Card>
-      <Card>
-        <CardTitle>Details {task ? <span className="font-mono normal-case">{task.name}</span> : null}</CardTitle>
-        {!task && <p className="muted text-sm">Select a node in the graph.</p>}
-        {task && (
-          <dl className="grid grid-cols-[130px_1fr] gap-x-2 gap-y-1 text-xs">
-            <dt className="muted">state</dt>
-            <dd>
-              <Badge status={task.status}>{task.status}</Badge>
-            </dd>
-            <dt className="muted">attempt</dt>
-            <dd>
-              {task.attempt} / 3
-            </dd>
-            <dt className="muted">lease owner</dt>
-            <dd className="font-mono">{task.lease_owner ?? '—'}</dd>
-            <dt className="muted">output</dt>
-            <dd className="font-mono break-all">{formatOutput(task)}</dd>
-            {task.error && (
-              <>
-                <dt className="muted">error</dt>
-                <dd className="font-mono break-all text-[var(--failed)]">{task.error}</dd>
-              </>
+      </div>
+      <div className="wf">
+        <div className="wm">
+          <div className="card">
+            <div className="ch">
+              <b className="m">{detail.id}</b>
+              <Badge status={detail.status}>{detail.status}</Badge>
+            </div>
+            <div className="sc">
+              <div style={{ height: 380 }} className="rounded-md border">
+                <ReactFlow
+                  nodes={nodes}
+                  edges={edges}
+                  nodeTypes={nodeTypes}
+                  onNodeClick={(_, node) => {
+                    setSelected(node.id);
+                    setAttempt(null);
+                  }}
+                  fitView
+                  proOptions={{ hideAttribution: true }}
+                  colorMode="light"
+                >
+                  <Background gap={24} size={1} />
+                </ReactFlow>
+              </div>
+            </div>
+            {events.length > 0 && (
+              <div className="evs">
+                <div className="mu" style={{ marginBottom: 4 }}>
+                  Retries and failures in this run. Select a row to open that task's log.
+                </div>
+                {events.map((t) => (
+                  <button
+                    key={t.id}
+                    onClick={() => {
+                      setSelected(t.name);
+                      setAttempt(null);
+                    }}
+                  >
+                    <span className="m mu">attempt {t.attempt}</span>
+                    <span className="m">{t.name}</span>
+                    <span className={t.status === 'failed' ? 'lb' : 'la'}>
+                      {t.status === 'failed' ? 'failed' : `attempt ${t.attempt} started`}
+                    </span>
+                  </button>
+                ))}
+              </div>
             )}
-          </dl>
-        )}
-      </Card>
-      <Card>
-        <CardTitle>Logs (final blob)</CardTitle>
-        {!task && <p className="muted text-sm">[no task selected]</p>}
-        {task && logs.isPending && <Skeleton className="mt-2 h-20 w-full" />}
-        {task && logs.isError && <p className="muted text-sm">(no log blob yet)</p>}
-        {task && logs.data !== undefined && <pre className="mt-2">{logs.data}</pre>}
-      </Card>
-    </div>
+            <div className="lp">
+              <div className="mu" style={{ marginBottom: 6 }}>
+                <b className="m">{task ? task.name : 'Select a task in the graph'}</b>
+                {task && task.attempt > 1 && (
+                  <>
+                    {Array.from({ length: task.attempt }, (_, i) => i + 1).map((n) => (
+                      <button
+                        key={n}
+                        className="chip"
+                        style={showAttempt === n ? { borderColor: 'var(--ink)' } : undefined}
+                        onClick={() => setAttempt(n)}
+                      >
+                        attempt {n}
+                      </button>
+                    ))}
+                  </>
+                )}
+              </div>
+              <div className="lgw">
+                {!task && <pre>No log yet. Select a task to read its log.</pre>}
+                {task && logs.isPending && <pre>Loading…</pre>}
+                {task && logs.isError && <pre>No log yet. This task starts when its upstream tasks succeed.</pre>}
+                {task && logs.data !== undefined && <pre>{logs.data}</pre>}
+              </div>
+            </div>
+          </div>
+        </div>
+        <aside className="rs" aria-label="Runs and details">
+          <div className="card">
+            <h3>Runs</h3>
+            <div className="rl">
+              {runs.map((r) => (
+                <button
+                  key={r.id}
+                  className={'ri' + (r.id === detail.id ? ' on' : '')}
+                  aria-current={r.id === detail.id}
+                  onClick={() => onSelectRun(r.id)}
+                >
+                  <span className="m">{r.id}</span>
+                  <Badge status={r.status}>{r.status}</Badge>
+                  <span className="mu" style={{ flexBasis: '100%' }}>
+                    bundle {r.bundle_version}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="card">
+            <h3 className="m">{detail.id}</h3>
+            {kv('Status', <Badge status={detail.status}>{detail.status}</Badge>)}
+            {kv('Version', detail.bundle_version)}
+            {kv('Retries', retries)}
+            {kv('Progress', `${done} of ${detail.tasks.length} tasks`)}
+            <div className="bar6">
+              <i style={{ width: `${(done / Math.max(detail.tasks.length, 1)) * 100}%` }} />
+            </div>
+          </div>
+          {task && (
+            <div className="card">
+              <h3 className="m">{task.name}</h3>
+              {kv('State', <Badge status={task.status}>{task.status}</Badge>)}
+              {kv('Attempt', `${task.attempt} of 3`)}
+              {kv('Lease', task.lease_owner ?? 'none')}
+              {kv('Output', task.output ? (task.output.type === 'inline' ? JSON.stringify(task.output.value) : `${task.output.codec} blob`) : 'none')}
+            </div>
+          )}
+          <div className="card">
+            <h3>Workflow</h3>
+            {kv('ID', <span className="m">{workflowId}</span>)}
+            {kv('Language', workflow.data?.language ?? '—')}
+            {kv('Bundle', workflow.data?.bundle ?? '—')}
+            {kv('Runs', runs.length)}
+          </div>
+        </aside>
+      </div>
+    </>
   );
 }

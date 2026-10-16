@@ -40,10 +40,10 @@ try {
   await page.getByLabel('Run inputs (JSON)').fill('{"date": "2026-10-16"}');
   await page.getByRole('button', { name: 'Create run', exact: true }).click();
   await page.waitForURL('**/workflows/smoke-ui?run=R-*');
-  await page.getByText('Runs of this workflow').waitFor();
-  const runRow = page.locator('tbody tr').first();
+  await page.getByText('Runs', { exact: true }).first().waitFor();
+  const runRow = page.locator('.rl .ri').first();
   await runRow.waitFor();
-  const runId = await runRow.locator('td').first().innerText();
+  const runId = await runRow.locator('.m').first().innerText();
   if (!/^R-\d+$/.test(runId)) throw new Error(`unexpected run id: ${runId}`);
 
   // run detail: graph node per task, click selects details + logs
@@ -51,7 +51,13 @@ try {
   const nodes = await page.locator('.react-flow__node').count();
   if (nodes !== 1) throw new Error(`expected 1 graph node, saw ${nodes}`);
   await page.locator('.react-flow__node').first().click();
-  await page.getByText('(no log blob yet)').waitFor();
+  await page.getByText('No log yet. This task starts when its upstream tasks succeed.').waitFor();
+
+  // remaining sections render without errors
+  for (const [path, heading] of [['/app/bundles', 'Bundles'], ['/app/workers', 'Workers'], ['/app/settings', 'Settings']]) {
+    await page.goto(`${BASE}${path}`, { waitUntil: 'networkidle' });
+    await page.locator('main h1', { hasText: heading }).waitFor();
+  }
 
   if (errors.length) throw new Error(`page errors: ${errors.join('; ')}`);
   console.log(`ui smoke OK: triggered ${runId}, graph + details + logs verified`);

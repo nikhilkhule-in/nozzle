@@ -1,75 +1,83 @@
-import { Link, createFileRoute } from '@tanstack/react-router';
+import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
 
 import { Badge } from '~/components/ui/badge';
-import { Card, CardTitle } from '~/components/ui/card';
 import { Skeleton } from '~/components/ui/skeleton';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '~/components/ui/table';
 import { TriggerRunDialog } from '~/components/TriggerRunDialog';
+import { PageHead } from '~/components/PageHead';
 import { api } from '~/lib/api';
 
 export const Route = createFileRoute('/')({
   component: WorkflowsPage,
   pendingComponent: WorkflowsPending,
-})
+});
 
 function WorkflowsPending() {
   return (
-    <div className="grid gap-3">
-      <div className="flex items-center justify-between">
-        <h2>Workflows</h2>
+    <>
+      <PageHead title="Workflows" />
+      <div className="card tw">
+        <Skeleton className="m-4 h-24" />
       </div>
-      <Card>
-        <CardTitle>All workflows</CardTitle>
-        <Skeleton className="mt-2 h-24 w-full" />
-      </Card>
-    </div>
-  )
-};
+    </>
+  );
+}
 
 function WorkflowsPage() {
+  const navigate = useNavigate();
   const workflows = useQuery({ queryKey: ['workflows'], queryFn: api.listWorkflows });
 
   return (
-    <div className="grid gap-3">
-      <div className="flex items-center justify-between">
-        <h2>Workflows</h2>
-        <TriggerRunDialog />
-      </div>
-      <Card>
-        <CardTitle>All workflows</CardTitle>
-        {workflows.isPending && <Skeleton className="mt-2 h-24 w-full" />}
-        {workflows.isError && <p>Failed to load workflows.</p>}
-        {workflows.data && workflows.data.length === 0 && <p className="muted">No workflows registered.</p>}
-        {workflows.data && workflows.data.length > 0 && (
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableHeader>ID</TableHeader>
-                <TableHeader>Language</TableHeader>
-                <TableHeader>Bundle</TableHeader>
-                <TableHeader>Tasks</TableHeader>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {workflows.data.map((w) => (
-                <TableRow key={w.id} clickable>
-                  <TableCell>
-                    <Link to="/workflows/$workflowId" params={{ workflowId: w.id }} className="font-mono">
-                      {w.id}
-                    </Link>
-                  </TableCell>
-                  <TableCell>
-                    <Badge status="queued">{w.language}</Badge>
-                  </TableCell>
-                  <TableCell className="font-mono text-xs">{w.bundle}</TableCell>
-                  <TableCell>{w.dag.tasks.length}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+    <>
+      <PageHead
+        title="Workflows"
+        meta={
+          <span style={{ display: 'flex', gap: 8 }}>
+            <TriggerRunDialog />
+          </span>
+        }
+      />
+      <div className="card tw">
+        {workflows.isPending && <Skeleton className="m-4 h-24" />}
+        {workflows.isError && <p className="mu" style={{ padding: 16 }}>Failed to load workflows.</p>}
+        {workflows.data && workflows.data.length === 0 && (
+          <p className="mu" style={{ padding: 16 }}>
+            No workflows registered.
+          </p>
         )}
-      </Card>
-    </div>
+        {workflows.data && workflows.data.length > 0 && (
+          <table className="grid-table">
+            <thead>
+              <tr>
+                <th>Workflow</th>
+                <th>Language</th>
+                <th>Bundle</th>
+                <th>Tasks</th>
+              </tr>
+            </thead>
+            <tbody>
+              {workflows.data.map((w) => (
+                <tr
+                  key={w.id}
+                  className="clickable"
+                  onClick={() => navigate({ to: '/workflows/$workflowId', params: { workflowId: w.id } })}
+                >
+                  <td className="m">{w.id}</td>
+                  <td>
+                    <Badge status="queued">{w.language}</Badge>
+                  </td>
+                  <td className="m">{w.bundle}</td>
+                  <td>{w.dag.tasks.length}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+      <p className="mu" style={{ marginTop: 12 }}>
+        Runs live inside their workflow — open one to see its runs, graph, and logs. Latest run status per
+        workflow appears there.
+      </p>
+    </>
   );
 }

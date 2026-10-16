@@ -1,30 +1,19 @@
-import * as React from 'react';
-
-import { cn } from '~/lib/utils';
-
-const badgeColors: Record<string, string> = {
-  succeeded: 'text-[var(--ok)]',
-  success: 'text-[var(--ok)]',
-  running: 'text-[var(--running)]',
-  failed: 'text-[var(--failed)]',
-  skipped: 'text-[var(--skipped)]',
-  queued: 'text-[var(--muted)]',
+const STATUS_VAR: Record<string, string> = {
+  succeeded: 'var(--ok)',
+  success: 'var(--ok)',
+  running: 'var(--rn)',
+  failed: 'var(--bd)',
+  rejected: 'var(--bd)',
+  skipped: 'var(--mu)',
+  queued: 'var(--id)',
+  waiting: 'var(--id)',
 };
 
-function Badge({ className, status, ...props }: React.HTMLAttributes<HTMLSpanElement> & { status: string }) {
+export function Badge({ status, children }: { status: string; children?: React.ReactNode }) {
   return (
-    <span
-      className={cn(
-        'inline-flex items-center gap-1.5 rounded-full border border-[var(--border)] px-2 py-0.5 text-xs font-medium',
-        badgeColors[status] ?? '',
-        className,
-      )}
-      {...props}
-    >
-      <i className="inline-block h-2 w-2 rounded-full bg-current" />
-      {status}
+    <span className="pl">
+      <i style={{ background: STATUS_VAR[status] ?? 'var(--id)' }} />
+      {children ?? status}
     </span>
   );
 }
-
-export { Badge };

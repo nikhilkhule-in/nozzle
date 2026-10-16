@@ -18,6 +18,9 @@ export default defineConfig({
       spa: {
         enabled: true,
         maskPath: '/app',
+        prerender: {
+          crawlLinks: true,
+        },
       },
     }),
     viteReact(),

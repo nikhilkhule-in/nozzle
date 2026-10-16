@@ -45,7 +45,7 @@ def create_app(config_path=None, store=None):
     app.state.knobs = knobs
 
     if knobs.ui_dist:
-        app.mount("/app", SPAStatic(directory=os.path.join(knobs.ui_dist, "app")),
+        app.mount("/app", SPAStatic(directory=os.path.join(knobs.ui_dist, "app"), html=True),
                   name="console")
 
     def _err(e):
