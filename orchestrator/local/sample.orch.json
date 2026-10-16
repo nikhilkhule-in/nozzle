@@ -1,0 +1,14 @@
+{
+  "poll_interval_secs": 10,
+  "heartbeat_secs": 15,
+  "lease_secs": 60,
+  "max_attempts": 3,
+  "inline_threshold": 65536,
+  "max_blob_bytes": 10485760,
+  "provider": "local",
+  "db_path": "nozzle.db",
+  "blob_dir": "blobs",
+  "log_dir": "logs",
+  "ui_dist": "",
+  "bundles": []
+}

@@ -1,0 +1,9 @@
+{
+  "PROVIDER": "cloudflare",
+  "STORE_MODE": "d1",
+  "BUNDLES": [],
+  "LEASE_SECS": "60",
+  "MAX_ATTEMPTS": "3",
+  "INLINE_THRESHOLD": "65536",
+  "MAX_BLOB_BYTES": "10485760"
+}

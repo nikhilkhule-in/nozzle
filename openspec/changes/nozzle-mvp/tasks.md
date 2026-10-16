@@ -52,5 +52,5 @@ Assumption recorded (design Open Question): `orchestrator/local` HTTP is Python 
 
 ## 8. Integration and release readiness
 
-- [ ] 8.1 Run the full matrix (local + Cloudflare conformance, SDK tests, UI smoke) and verify everything is green in one pass
-- [ ] 8.2 Record MVP defaults (poll, heartbeat, lease, max attempts, N=64KB, max single-shot blob size) and jq-verifiable config samples for both orchestrators, and verify each sample loads without warnings
+- [x] 8.1 Run the full matrix (local + Cloudflare conformance, SDK tests, UI smoke) and verify everything is green in one pass
+- [x] 8.2 Record MVP defaults (poll, heartbeat, lease, max attempts, N=64KB, max single-shot blob size) and jq-verifiable config samples for both orchestrators, and verify each sample loads without warnings
