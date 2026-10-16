@@ -8,6 +8,7 @@ import {
 } from '@tanstack/react-router'
 import * as React from 'react'
 import type { QueryClient } from '@tanstack/react-query'
+import { QueryClientProvider } from '@tanstack/react-query'
 import appCss from '~/styles/app.css?url'
 
 export const Route = createRootRouteWithContext<{
@@ -40,9 +41,11 @@ const NAV = [
 ] as const
 
 function RootComponent() {
+  const { queryClient } = Route.useRouteContext()
   return (
     <RootDocument>
-      <div className="app">
+      <QueryClientProvider client={queryClient}>
+        <div className="app">
         <aside className="sidebar">
           <div className="brand">nozzle</div>
           <nav>
@@ -63,6 +66,7 @@ function RootComponent() {
           <Outlet />
         </main>
       </div>
+      </QueryClientProvider>
     </RootDocument>
   )
 }
