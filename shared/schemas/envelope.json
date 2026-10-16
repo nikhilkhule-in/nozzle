@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://nozzle.dev/schemas/envelope.json",
+  "title": "Task output envelope",
+  "description": "Routing wrapper for task outputs. The orchestrator validates size and hash only and never deserializes the payload. Blob bytes live in the object store under blob.key.",
+  "type": "object",
+  "required": ["type", "codec", "size", "sha256"],
+  "properties": {
+    "type": { "type": "string", "enum": ["inline", "blob"] },
+    "codec": { "type": "string", "minLength": 1 },
+    "size": { "type": "integer", "minimum": 0 },
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "value": { "description": "Decoded value; present when type is inline." },
+    "blob": { "$ref": "#/$defs/BlobRef" }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "type": { "const": "inline" } } },
+      "then": { "required": ["value"], "not": { "required": ["blob"] } }
+    },
+    {
+      "if": { "properties": { "type": { "const": "blob" } } },
+      "then": { "required": ["blob"], "not": { "required": ["value"] } }
+    }
+  ],
+  "$defs": {
+    "BlobRef": {
+      "type": "object",
+      "required": ["backend", "key", "size", "sha256"],
+      "properties": {
+        "backend": { "type": "string", "minLength": 1 },
+        "key": { "type": "string", "minLength": 1 },
+        "size": { "type": "integer", "minimum": 0 },
+        "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+      },
+      "additionalProperties": false
+    }
+  }
+}

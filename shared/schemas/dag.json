@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://nozzle.dev/schemas/dag.json",
+  "title": "Workflow DAG",
+  "description": "Static workflow definition: tasks plus dependency edges. Mirrors nozzle-core dag::WorkflowSpec; semantic checks (uniqueness, acyclicity) live in core validation, not here.",
+  "type": "object",
+  "required": ["id", "language", "tasks", "edges"],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "language": { "type": "string", "minLength": 1 },
+    "tasks": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/TaskSpec" }
+    },
+    "edges": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/Edge" }
+    }
+  },
+  "$defs": {
+    "TaskSpec": {
+      "type": "object",
+      "required": ["name", "runtime"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "runtime": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "Edge": {
+      "type": "object",
+      "required": ["upstream", "downstream", "arg"],
+      "properties": {
+        "upstream": { "type": "string", "minLength": 1 },
+        "downstream": { "type": "string", "minLength": 1 },
+        "arg": { "type": "string", "minLength": 1 },
+        "predicate": { "$ref": "#/$defs/Predicate" }
+      },
+      "additionalProperties": false
+    },
+    "Predicate": {
+      "type": "object",
+      "required": ["op", "value"],
+      "properties": {
+        "op": { "type": "string", "enum": ["equals", "not_equals"] },
+        "value": { "type": ["string", "number", "boolean"] }
+      },
+      "additionalProperties": false
+    }
+  }
+}
