@@ -9,7 +9,7 @@
 
 ## Orchestrator config
 
-`wrangler.toml` binds D1 + R2. Runtime knobs are `[vars]` (`PROVIDER`,
+`wrangler.jsonc` binds D1 + R2. Runtime knobs are `vars` (`PROVIDER`,
 `STORE_MODE=d1`, lease/attempt/threshold limits). `BUNDLES` is a JSON list
 of `{name, type, ...}`; git bundles resolve versions via explicit `version`
 or the GitHub API, `local` bundles are rejected for remote pools.
