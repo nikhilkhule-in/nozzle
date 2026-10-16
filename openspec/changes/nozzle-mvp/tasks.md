@@ -11,7 +11,7 @@ Assumption recorded (design Open Question): `orchestrator/local` HTTP is Python 
 
 - [x] 2.1 Scaffold `core/` crate (dag, refs, xcom, states, readiness, config modules) with unit tests for `next_ready` and predicate eval, and verify `cargo test` passes
 - [x] 2.2 Expose PyO3 bindings with lockstep version assertion and verify a Python import calls `validate`/`next_ready` from Rust in a test
-- [ ] 2.3 Expose wasm-bindgen bindings for the same pure functions and verify `wasm-pack build` output loads in a Node smoke test
+- [x] 2.3 Expose wasm-bindgen bindings for the same pure functions and verify `wasm-pack build` output loads in a Node smoke test
 - [ ] 2.4 Document core version-compat rule (core/SDK lockstep, asserted at registration and run creation) in `core/README.md` and verify the documented assertion triggers on a mismatched version in a test
 
 ## 3. Shared contract + conformance
