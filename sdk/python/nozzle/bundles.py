@@ -43,6 +43,12 @@ def parse_file(path, workflow_id=None):
         sys.path.remove(str(path.parent))
         sys.modules.pop(module_name, None)
     new_specs = PARSED_SPECS[before:]
+    for spec in new_specs:
+        # Tasks must live in the parsed file (MVP single-file workflows), so
+        # code refs are bundle-root-relative and importable by workers.
+        spec["source"] = {"file": path.name}
+        for task_spec in spec["tasks"]:
+            spec["code"][task_spec["name"]] = f"{path.stem}:{task_spec['name']}"
     if workflow_id is not None:
         new_specs = [s for s in new_specs if s["id"] == workflow_id]
         if not new_specs:

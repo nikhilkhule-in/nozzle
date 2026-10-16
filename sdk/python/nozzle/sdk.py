@@ -84,6 +84,7 @@ class _Builder:
     edges: list = field(default_factory=list)
     policies: dict = field(default_factory=dict)
     code: dict = field(default_factory=dict)
+    params: dict = field(default_factory=dict)
 
     def add_task(self, name, runtime, policy, code_ref):
         if name in self.tasks:
@@ -121,6 +122,7 @@ class _Builder:
             "edges": list(self.edges),
             "policies": dict(self.policies),
             "code": dict(self.code),
+            "params": {k: dict(v) for k, v in self.params.items()},
         }
 
 
@@ -182,12 +184,16 @@ def task(_func=None, *, store="auto", runtime=DEFAULT_RUNTIME):
                 raise ValueError(f"bad arguments for task {func.__name__!r}: {e}")
             bound.apply_defaults()
             ref_args = set()
+            literals = {}
             for param, value in bound.arguments.items():
                 if isinstance(value, OutputRef):
                     ref_args.add(value.task)
                     builder.add_edge(value.task, func.__name__, param)
                 else:
                     _check_literal(value, func.__name__, param)
+                    literals[param] = value
+            if literals:
+                builder.params.setdefault(func.__name__, {}).update(literals)
             if predicate is not None:
                 if predicate.task not in ref_args:
                     raise ValueError(
@@ -204,6 +210,7 @@ def task(_func=None, *, store="auto", runtime=DEFAULT_RUNTIME):
         invoke._nozzle_task__ = True
         invoke._nozzle_runtime__ = runtime
         invoke._nozzle_store__ = store
+        invoke._nozzle_raw__ = func
         return invoke
 
     if _func is not None:

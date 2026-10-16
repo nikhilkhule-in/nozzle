@@ -346,6 +346,7 @@
           "bundle": { "type": "string", "description": "Bundle name; the worker resolves it through its own bundle config" },
           "bundle_version": { "type": "string" },
           "code_ref": { "type": "string", "description": "module:qualname of the task function inside the bundle" },
+          "source": { "type": "object", "description": "Bundle-relative source file carrying the task code", "properties": { "file": { "type": "string" } } },
           "lease_expires_at": { "type": "string" }
         }
       },

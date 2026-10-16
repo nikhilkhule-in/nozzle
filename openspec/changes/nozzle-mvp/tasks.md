@@ -16,7 +16,7 @@ Assumption recorded (design Open Question): `orchestrator/local` HTTP is Python 
 
 ## 3. Shared contract + conformance
 
-- [ ] 3.1 Publish canonical `shared/api/openapi.json` covering every endpoint in the contract (workflows, runs, worker register, claim/heartbeat/complete/fail, blob upload, log write/read) so new provider implementations code against it, and verify it lints plus a generated client smoke-tests each operation against the local stack
+- [x] 3.1 Publish canonical `shared/api/openapi.json` covering every endpoint in the contract (workflows, runs, worker register, claim/heartbeat/complete/fail, blob upload, log write/read) so new provider implementations code against it, and verify it lints plus a generated client smoke-tests each operation against the local stack
 - [x] 3.2 Publish JSON Schemas for `dag_json` and the XCom envelope in `shared/schemas/`, and verify sample payloads validate against them in a test
 - [x] 3.3 Build the Store conformance suite (atomic claim, lease expiry, idempotent complete, readiness, skipped propagation) in `shared/conformance/` and verify it runs green against an in-memory fake Store
 
@@ -31,7 +31,7 @@ Assumption recorded (design Open Question): `orchestrator/local` HTTP is Python 
 ## 5. Local stack end-to-end (reference implementation)
 
 - [x] 5.1 Implement `orchestrator/local` (FastAPI + SQLite store incl. per-orchestrator N default 64KB, local+git bundle config, run-pinned versions, blob/log via local filesystem) and verify the Store conformance suite passes against it
-- [ ] 5.2 Implement `worker/local` (register, poll/claim, heartbeat, bundle materialize, execute by task name, envelope completion, final log blob via orchestrator) and verify a two-task linear workflow runs end-to-end locally
+- [x] 5.2 Implement `worker/local` (register, poll/claim, heartbeat, bundle materialize, execute by task name, envelope completion, final log blob via orchestrator) and verify a two-task linear workflow runs end-to-end locally
 - [ ] 5.3 Verify a predicate-branched workflow runs locally with the untaken branch skipped and the join task receiving available inputs
 - [ ] 5.4 Verify a large-output workflow stores a blob reference (not inline bytes) and the downstream task receives equal bytes after fetch
 - [ ] 5.5 Document local quickstart (`orchestrator/local` + `worker/local` + sample bundle) and verify the documented commands reproduce the end-to-end run

@@ -25,7 +25,9 @@ def test_sample_project_parses_to_schema_valid_output():
         {"upstream": "extract", "downstream": "load", "arg": "snapshot"}
     ]
     assert spec["policies"]["load"] == "blob-only"
-    assert spec["code"]["extract"].endswith(":extract")
+    assert spec["code"] == {"extract": "etl:extract", "load": "etl:load"}
+    assert spec["source"] == {"file": "etl.py"}
+    assert spec["params"] == {"extract": {"date": "2026-10-16"}}
 
 
 def test_missing_file_rejected():

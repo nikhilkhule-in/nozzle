@@ -316,6 +316,7 @@ class SQLiteStore:
                         "bundle": self._workflow_bundle(run["workflow_id"]),
                         "bundle_version": run["bundle_version"],
                         "code_ref": self._code_ref(run["workflow_id"], task["name"]),
+                        "source": dag.get("source", {}),
                         "lease_expires_at": lease_expires_at,
                     }
         return None
@@ -341,6 +342,12 @@ class SQLiteStore:
         dag, _ = self._dag(run["workflow_id"])
         by_name = {r["name"]: r for r in self._task_rows(run_id)}
         inputs = {}
+        for param, literal in dag.get("params", {}).get(name, {}).items():
+            raw = json.dumps(literal).encode()
+            inputs[param] = {
+                "type": "inline", "codec": "json", "size": len(raw),
+                "sha256": hashlib.sha256(raw).hexdigest(), "value": literal,
+            }
         for edge in dag["edges"]:
             if edge["downstream"] != name:
                 continue
