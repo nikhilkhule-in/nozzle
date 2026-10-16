@@ -113,7 +113,12 @@ export function RunDetail({
     queryFn: () => api.getWorkflow(run.data!.workflow_id),
     enabled: !!run.data,
   });
-  const task: TaskRecord | null = run.data?.tasks.find((t) => t.name === selected) ?? null;
+  const task: TaskRecord | null =
+    run.data?.tasks.find((t) => t.name === selected) ??
+    run.data?.tasks.find((t) => t.status === 'failed') ??
+    run.data?.tasks.find((t) => t.status === 'running') ??
+    run.data?.tasks[0] ??
+    null;
   const showAttempt = attempt ?? task?.attempt ?? 1;
   const logs = useQuery({
     queryKey: ['logs', runId, task?.id, showAttempt],

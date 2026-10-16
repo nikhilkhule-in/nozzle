@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
-import { useQuery } from '@tanstack/react-query';
+import { useQueries, useQuery } from '@tanstack/react-query';
 
 import { Badge } from '~/components/ui/badge';
 import { Skeleton } from '~/components/ui/skeleton';
@@ -26,6 +26,19 @@ function WorkflowsPending() {
 function WorkflowsPage() {
   const navigate = useNavigate();
   const workflows = useQuery({ queryKey: ['workflows'], queryFn: api.listWorkflows });
+  const latest = useQueries({
+    queries: (workflows.data ?? []).map((w) => ({
+      queryKey: ['runs', w.id, 'latest-status'],
+      queryFn: async () => {
+        const runs = await api.listRuns(w.id);
+        return runs.length ? runs[runs.length - 1] : null;
+      },
+      enabled: !!workflows.data,
+    })),
+  });
+  const latestByWorkflow = new Map(
+    (workflows.data ?? []).map((w, i) => [w.id, latest[i]?.data]),
+  );
 
   return (
     <>
@@ -53,6 +66,7 @@ function WorkflowsPage() {
                 <th>Language</th>
                 <th>Bundle</th>
                 <th>Tasks</th>
+                <th>Latest run</th>
               </tr>
             </thead>
             <tbody>
@@ -68,6 +82,13 @@ function WorkflowsPage() {
                   </td>
                   <td className="m">{w.bundle}</td>
                   <td>{w.dag.tasks.length}</td>
+                  <td>
+                    {(() => {
+                      const r = latestByWorkflow.get(w.id);
+                      if (r === undefined) return <span className="mu">…</span>;
+                      return r ? <Badge status={r.status}>{r.status}</Badge> : <span className="mu">—</span>;
+                    })()}
+                  </td>
                 </tr>
               ))}
             </tbody>
