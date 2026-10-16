@@ -6,14 +6,28 @@ import { Badge } from '~/components/ui/badge';
 import { Card, CardTitle } from '~/components/ui/card';
 import { Skeleton } from '~/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '~/components/ui/table';
+import { RunDetail } from '~/components/RunDetail';
 import { TriggerRunDialog } from '~/components/TriggerRunDialog';
 import { api } from '~/lib/api';
 
 const searchSchema = z.object({ run: z.string().optional() });
 
+function WorkflowPending() {
+  return (
+    <div className="grid gap-3">
+      <Skeleton className="h-8 w-64" />
+      <Card>
+        <CardTitle>Runs of this workflow</CardTitle>
+        <Skeleton className="mt-2 h-24 w-full" />
+      </Card>
+    </div>
+  );
+}
+
 export const Route = createFileRoute('/workflows/$workflowId')({
   validateSearch: (search) => searchSchema.parse(search),
   component: WorkflowPage,
+  pendingComponent: WorkflowPending,
 });
 
 function WorkflowPage() {
@@ -74,12 +88,7 @@ function WorkflowPage() {
           </Table>
         )}
       </Card>
-      {search.run && (
-        <Card>
-          <CardTitle>Run {search.run}</CardTitle>
-          <p className="muted text-sm">Run graph and logs land in task 7.3.</p>
-        </Card>
-      )}
+      {search.run && <RunDetail runId={search.run} />}
     </div>
   );
 }

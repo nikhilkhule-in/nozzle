@@ -45,8 +45,15 @@ try {
   const runId = await runRow.locator('td').first().innerText();
   if (!/^R-\d+$/.test(runId)) throw new Error(`unexpected run id: ${runId}`);
 
+  // run detail: graph node per task, click selects details + logs
+  await page.locator('.react-flow__node').first().waitFor();
+  const nodes = await page.locator('.react-flow__node').count();
+  if (nodes !== 1) throw new Error(`expected 1 graph node, saw ${nodes}`);
+  await page.locator('.react-flow__node').first().click();
+  await page.getByText('(no log blob yet)').waitFor();
+
   if (errors.length) throw new Error(`page errors: ${errors.join('; ')}`);
-  console.log(`ui smoke OK: triggered ${runId}, navigated to workflow view`);
+  console.log(`ui smoke OK: triggered ${runId}, graph + details + logs verified`);
 } finally {
   await browser.close();
 }

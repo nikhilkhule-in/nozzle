@@ -47,7 +47,7 @@ Assumption recorded (design Open Question): `orchestrator/local` HTTP is Python 
 
 - [x] 7.1 Scaffold TanStack Start SPA (client-only static build) with shadcn setup and routing skeleton, and verify `vite build` emits `ui/dist/` served same-origin by the local orchestrator
 - [x] 7.2 Implement workflows/runs lists + manual trigger dialog with JSON validation, and verify trigger-to-detail navigation against the local stack in a browser smoke test
-- [ ] 7.3 Implement run detail (task table + React Flow DAG colored by state + log viewer reading final blobs), and verify it matches the approved sketch layout
+- [x] 7.3 Implement run detail (task table + React Flow DAG colored by state + log viewer reading final blobs), and verify it matches the approved sketch layout
 - [ ] 7.4 Verify the same `ui/dist/` bundle works unmodified against the Cloudflare orchestrator
 
 ## 8. Integration and release readiness
