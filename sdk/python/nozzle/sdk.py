@@ -31,10 +31,49 @@ _VALID_POLICIES = ("auto", "inline-only", "blob-only")
 
 @dataclass
 class OutputRef:
-    """Promise of a task's future output. Never truth-test one (see 4.2)."""
+    """Promise of a task's future output.
+
+    Never truth-test one: `if ref:` cannot work because the value does not
+    exist until a worker executes the task. Declare branching with
+    `ref.equals(value)` / `ref.not_equals(value)` passed as `run_if=` to the
+    downstream task instead.
+    """
 
     task: str
     policy: str = "auto"
+
+    def __bool__(self):
+        raise ValueError(
+            f"cannot truth-test output of task {self.task!r}: the value is "
+            "produced later by a worker. Use "
+            f"`{self.task}_ref.equals(value)` / `.not_equals(value)` as "
+            "`run_if=` on the downstream task to declare the branch."
+        )
+
+    def equals(self, value):
+        """Branch predicate: downstream runs only if this output equals value."""
+        return Predicate(task=self.task, op="equals", value=_check_scalar(value))
+
+    def not_equals(self, value):
+        """Branch predicate: downstream runs unless this output equals value."""
+        return Predicate(task=self.task, op="not_equals", value=_check_scalar(value))
+
+
+@dataclass
+class Predicate:
+    """Declarative gate binding an upstream task output to an expected value."""
+
+    task: str
+    op: str
+    value: object = None
+
+
+def _check_scalar(value):
+    if isinstance(value, bool) or isinstance(value, (str, int, float)):
+        return value
+    raise ValueError(
+        f"predicate value {value!r} must be a JSON scalar (string, number, boolean)"
+    )
 
 
 @dataclass
@@ -59,6 +98,19 @@ class _Builder:
     def add_edge(self, upstream, downstream, arg):
         self.edges.append(
             {"upstream": upstream, "downstream": downstream, "arg": arg}
+        )
+
+    def add_predicate(self, upstream, downstream, predicate):
+        for edge in self.edges:
+            if edge["upstream"] == upstream and edge["downstream"] == downstream:
+                if "predicate" in edge:
+                    raise ValueError(
+                        f"duplicate branch predicate on {upstream!r} -> {downstream!r}"
+                    )
+                edge["predicate"] = predicate
+                return
+        raise ValueError(
+            f"cannot attach predicate: no edge {upstream!r} -> {downstream!r}"
         )
 
     def to_spec(self):
@@ -113,16 +165,39 @@ def task(_func=None, *, store="auto", runtime=DEFAULT_RUNTIME):
 
         def invoke(*args, **kwargs):
             builder = _active_builder()
+            predicate = kwargs.pop("run_if", None)
+            if "run_if" in sig.parameters:
+                raise ValueError(
+                    f"task {func.__name__!r} declares a 'run_if' parameter, "
+                    "which is reserved for branch predicates"
+                )
+            if predicate is not None and not isinstance(predicate, Predicate):
+                raise ValueError(
+                    f"run_if= on task {func.__name__!r} must be built with "
+                    "ref.equals(value) or ref.not_equals(value)"
+                )
             try:
                 bound = sig.bind(*args, **kwargs)
             except TypeError as e:
                 raise ValueError(f"bad arguments for task {func.__name__!r}: {e}")
             bound.apply_defaults()
+            ref_args = set()
             for param, value in bound.arguments.items():
                 if isinstance(value, OutputRef):
+                    ref_args.add(value.task)
                     builder.add_edge(value.task, func.__name__, param)
                 else:
                     _check_literal(value, func.__name__, param)
+            if predicate is not None:
+                if predicate.task not in ref_args:
+                    raise ValueError(
+                        f"run_if= on task {func.__name__!r} refers to task "
+                        f"{predicate.task!r}, which is not an argument of this call"
+                    )
+                builder.add_predicate(
+                    predicate.task, func.__name__,
+                    {"op": predicate.op, "value": predicate.value},
+                )
             builder.add_task(func.__name__, runtime, store, code_ref)
             return OutputRef(task=func.__name__, policy=store)
 
