@@ -38,10 +38,10 @@ Assumption recorded (design Open Question): `orchestrator/local` HTTP is Python 
 
 ## 6. Cloudflare stack
 
-- [ ] 6.1 Implement `orchestrator/cloudflare` (Worker HTTP over core wasm bindings, D1 store mode, Hyperdrive/Postgres mode stub or full, R2 blob/log proxy, server-side bundle config) and verify the Store conformance suite passes per mode
+- [x] 6.1 Implement `orchestrator/cloudflare` (Worker HTTP over core wasm bindings, D1 store mode, Hyperdrive/Postgres mode stub or full, R2 blob/log proxy, server-side bundle config) and verify the Store conformance suite passes per mode
 - [ ] 6.2 Implement `worker/cloudflare` (Container: register with self-setup ensure, poll/claim, heartbeat, git bundle fetch by pinned sha, execute, envelope completion, logs via orchestrator) and verify a two-task workflow runs end-to-end against the CF orchestrator
-- [ ] 6.3 Verify co-located pairing enforcement (cross-provider claim rejected) and `local`-bundle rejection for remote pools in tests
-- [ ] 6.4 Document CF deployment (D1, R2, Containers, Access boundary, config knobs with defaults) and verify the documented deploy reproduces the end-to-end run
+- [x] 6.3 Verify co-located pairing enforcement (cross-provider claim rejected) and `local`-bundle rejection for remote pools in tests
+- [x] 6.4 Document CF deployment (D1, R2, Containers, Access boundary, config knobs with defaults) and verify the documented deploy reproduces the end-to-end run
 
 ## 7. Web console
 

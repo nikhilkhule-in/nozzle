@@ -1,0 +1,16 @@
+name = "nozzle-worker-manager"
+main = "src/index.ts"
+compatibility_date = "2026-10-16"
+
+[[containers]]
+class_name = "NozzleWorkerPool"
+image = "../image/Dockerfile"
+max_instances = 5
+
+[[durable_objects.bindings]]
+name = "WORKER_POOL"
+class_name = "NozzleWorkerPool"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["NozzleWorkerPool"]

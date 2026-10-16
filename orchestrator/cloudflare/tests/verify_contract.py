@@ -23,7 +23,8 @@ BUNDLE = os.environ.get("NOZZLE_TEST_BUNDLE", "git-dev")
 def call(method, path, body=None):
     req = urllib.request.Request(
         BASE + path, data=json.dumps(body).encode() if body is not None else None,
-        method=method, headers={"Content-Type": "application/json"})
+        method=method, headers={"Content-Type": "application/json",
+                                "User-Agent": "nozzle-client/0.1 (+contract-verification)"})
     try:
         with urllib.request.urlopen(req) as r:
             raw = r.read()
@@ -118,6 +119,24 @@ def main():
     s, foreign = call("POST", "/tasks/claim",
                       {"worker_id": "w-cf", "language": "python", "runtime": "other-runtime"})
     check("no work for unknown runtime", s == 204, s)
+
+    s, other = call("POST", "/workers/register",
+                    {"worker_id": "w-other", "language": "python",
+                     "runtime": "cf-container", "core_version": "0.1.0",
+                     "provider": "elsewhere"})
+    check("foreign provider registers", s == 200 and other["verdict"] == "accepted", other)
+    s, denied = call("POST", "/tasks/claim",
+                     {"worker_id": "w-other", "language": "python", "runtime": "cf-container"})
+    check("cross-provider claim rejected", s == 403, denied)
+
+    local_bundle = os.environ.get("LOCAL_REJECT_BUNDLE")
+    if local_bundle:
+        s, _ = call("POST", "/workflows",
+                    {"id": "local-reject", "language": "python",
+                     "bundle": local_bundle, "dag": DIAMOND})
+        check("local-bundle workflow registers", s in (200, 201), s)
+        s, run = call("POST", "/runs", {"workflow_id": "local-reject", "inputs": {}})
+        check("local bundle rejected for remote pools", s == 400, run)
 
     print("ALL CONTRACT CHECKS PASSED")
 

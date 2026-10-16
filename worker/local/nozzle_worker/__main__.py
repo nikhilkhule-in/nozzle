@@ -11,6 +11,8 @@ def main():
     parser = argparse.ArgumentParser(description="Nozzle local worker")
     parser.add_argument("--orch-url", required=True)
     parser.add_argument("--worker-id", default=None)
+    parser.add_argument("--provider", default="local")
+    parser.add_argument("--runtime", default="local-process")
     parser.add_argument("--bundles", required=True, help="JSON file with a 'bundles' list")
     parser.add_argument("--poll-interval", type=float, default=2.0)
     parser.add_argument("--until-idle", type=int, default=0,
@@ -19,6 +21,7 @@ def main():
     with open(args.bundles) as f:
         bundles = json.load(f)["bundles"]
     worker = Worker(args.orch_url, worker_id=args.worker_id, bundles=bundles,
+                    provider=args.provider, runtime=args.runtime,
                     poll_interval=args.poll_interval)
     print(worker.register(), flush=True)
     idle = 0

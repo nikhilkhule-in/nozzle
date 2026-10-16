@@ -48,7 +48,8 @@ class Client:
         data = json.dumps(body).encode() if body is not None else None
         request = urllib.request.Request(
             url, data=data, method=method,
-            headers={"Content-Type": "application/json"},
+            headers={"Content-Type": "application/json",
+                     "User-Agent": "nozzle-client/0.1 (+contract-verification)"},
         )
         try:
             with urllib.request.urlopen(request) as response:
