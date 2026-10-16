@@ -6,7 +6,7 @@ interface Env {
 }
 
 export class NozzleWorkerPool extends Container {
-  defaultPort = 0;
+  // No inbound ports: instances poll the orchestrator over HTTPS egress.
 }
 
 const app = new Hono<{ Bindings: Env }>();
@@ -14,8 +14,12 @@ const app = new Hono<{ Bindings: Env }>();
 app.post("/instances", async (c) => {
   const body = await c.req.json<{ name?: string; env?: Record<string, string> }>();
   const name = body.name ?? `w-${Date.now().toString(36)}`;
-  const stub = c.env.WORKER_POOL.getByName(name);
-  await stub.start({ envVars: body.env ?? {} });
+  try {
+    const stub = c.env.WORKER_POOL.getByName(name);
+    await stub.start({ envVars: body.env ?? {} });
+  } catch (e) {
+    return c.json({ instance: name, error: e instanceof Error ? e.message : String(e) }, 500);
+  }
   return c.json({ instance: name, started: true });
 });
 
