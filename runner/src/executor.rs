@@ -4,7 +4,7 @@
 //! decides *how* it runs. This keeps the scheduler agnostic to the
 // execution substrate (local process, Lambda, CF container, …).
 
-use crate::ingest::TaskDef;
+use crate::ingest::{TaskDef, ORDER_ARG};
 use nozzle_core::dag::WorkflowSpec;
 use std::collections::BTreeMap;
 
@@ -94,7 +94,7 @@ impl Executor for LocalExecutor {
         for e in spec
             .edges
             .iter()
-            .filter(|e| e.downstream == name && e.arg != "order")
+            .filter(|e| e.downstream == name && e.arg != ORDER_ARG)
         {
             let value = outputs
                 .get(&e.upstream)
@@ -143,4 +143,18 @@ mod tests {
         assert_eq!(trim_trailing_newlines(b"\n\n"), "");
     }
 
+    #[test]
+    fn ordering_only_edge_injects_nothing() {
+        // A pure `needs:` edge (arg = ORDER_ARG) must not be treated as a
+        // data-flow binding: execution must not require the upstream output.
+        let loaded = crate::ingest::load_str(
+            "name: w\ntasks:\n  - id: a\n    cmd: exit 0\n  - id: b\n    cmd: exit 0\n    needs: [a]\n",
+        )
+        .unwrap();
+        let executor = LocalExecutor::default();
+        let outputs = BTreeMap::new(); // upstream output absent
+        assert!(executor
+            .execute(&loaded.tasks["b"], &loaded.spec, "b", &outputs)
+            .is_ok());
+    }
 }
