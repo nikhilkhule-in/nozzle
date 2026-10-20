@@ -1,0 +1,166 @@
+---
+title: Getting Started
+description: "Build the workspace, run the tests, and take the demo workflow from definition to a fresh docker image."
+related:
+  - guide/what-is-nozzle
+  - guide/workflows/yaml
+  - reference/cli
+---
+
+import { Tabs } from 'fumadocs-ui/components/tabs';
+import { Tab } from 'fumadocs-ui/components/tabs';
+
+## Prerequisites
+
+| Tool | Needed for | Notes |
+|---|---|---|
+| Rust toolchain (stable) | everything | `cargo`, `just` recipes assume it on `PATH` |
+| Docker (daemon running) | the demo workflow | only the `build`/`verify` demo tasks touch docker |
+| `just` | convenience recipes | plain `cargo` works without it |
+
+## Build and test
+
+```bash
+cargo build        # builds core + runner via the root workspace
+just test          # core unit tests, runner unit tests, runner integration tests
+```
+
+`just test` compiles the workspace and runs every Rust test suite: 20 tests in
+`nozzle-core`, 15 unit tests in `nozzle-run` (ingest, scheduler, executor),
+and 9 integration tests that drive the whole pipeline (including the real
+binary).
+
+## The demo workflow
+
+The demo builds a uniquely-tagged docker image through the engine. Today you
+define it in YAML; the planned Python and JS/TS frontends will express the
+same workflow to the same engine.
+
+<Tabs items={['YAML', 'Python', 'TypeScript']} groupId="definition-language" persist>
+  <Tab value="YAML">
+
+```yaml showLineNumbers {6-7}
+name: build-random-image
+tasks:
+  - id: gen-tag
+    cmd: echo "nozzle-$(date +%s)-$(head -c4 /dev/urandom | od -An -tx1 | tr -d ' \n')"
+  - id: build
+    cmd: docker build -t "$IMAGE_TAG" examples/context
+    needs: [gen-tag]
+    env: { IMAGE_TAG: gen-tag }
+```
+
+  </Tab>
+  <Tab value="Python">
+
+```python title="planned SDK — design sketch"
+from nozzle import Workflow
+
+wf = Workflow("build-random-image")
+gen = wf.task("gen-tag", cmd='echo "nozzle-$(date +%s)"')
+wf.task("build", cmd="docker build -t $IMAGE_TAG examples/context",
+        env={"IMAGE_TAG": gen})
+
+wf.run()
+```
+
+<Callout type="warn" title="Planned">
+  The Python SDK does not ship yet — see
+  [Python workflows](/docs/guide/workflows/python). YAML is the current
+  definition language.
+</Callout>
+
+  </Tab>
+  <Tab value="TypeScript">
+
+```ts title="planned SDK — design sketch"
+import { Workflow } from "@nozzle/core";
+
+const wf = new Workflow("build-random-image");
+const gen = wf.task("gen-tag", { cmd: 'echo "nozzle-$(date +%s)"' });
+wf.task("build", {
+  cmd: "docker build -t $IMAGE_TAG examples/context",
+  env: { IMAGE_TAG: gen },
+});
+
+await wf.run();
+```
+
+<Callout type="warn" title="Planned">
+  The JS/TS SDK does not ship yet — see
+  [JS/TS workflows](/docs/guide/workflows/typescript). YAML is the current
+  definition language.
+</Callout>
+
+  </Tab>
+</Tabs>
+
+The YAML file is `examples/build-random-image.yaml` in the repo — the next
+section runs it.
+
+## Run the demo
+
+```bash
+just run-demo
+```
+
+which is `cargo run -p nozzle-run -- run examples/build-random-image.yaml`.
+Expected output:
+
+```text
+-> gen-tag: sh -c 'echo "nozzle-$(date +%s)-$(head -c4 /dev/urandom | od -An -tx1 | tr -d ' \n')"'
+<- gen-tag: succeeded in 0.0s
+-> build: sh -c 'docker build -t "$IMAGE_TAG" examples/context'
+<- build: succeeded in 1.4s
+-> verify: sh -c 'docker image inspect "$IMAGE_TAG" > /dev/null'
+<- verify: succeeded in 0.1s
+== run 'build-random-image' SUCCEEDED ==
+   gen-tag: succeeded in 0.0s
+   build: succeeded in 1.4s
+   verify: succeeded in 0.1s
+```
+
+Each `->` line is a task starting (the command as written in the workflow),
+each `<-` line is its terminal state, and the closing summary names every
+task.
+
+<Callout type="info" title="Live stderr">
+  Docker build progress streams to your terminal while it happens — the
+  runner captures a task's stdout for data flow but lets stderr pass through
+  live. Docker writes its build log to stderr.
+</Callout>
+
+## Prove it is real
+
+Run the demo a second time. The tag is generated from the clock plus four
+random bytes, so the two runs produce distinct images:
+
+```bash
+docker images --filter reference='nozzle-*' --format '{{.Repository}}'
+```
+
+Two distinct `nozzle-<epoch>-<hex>` entries is the end-to-end proof: a
+workflow definition in, genuinely executed work out.
+
+## Where to go next
+
+- [Writing YAML workflows](/docs/guide/workflows/yaml) for authoring
+  patterns: pipelines, data flow, fan-in.
+- The [YAML reference](/docs/reference/yaml-reference) for everything a
+  workflow file may contain.
+- [Running](/docs/guide/running) for CLI usage, exit codes, and output format.
+- [Execution semantics](/docs/guide/execution-semantics) for ordering,
+  failure, and data-flow behavior.
+
+## Troubleshooting
+
+- **`cannot spawn` / docker errors inside `build`** — the docker daemon is not
+  reachable from the task's environment. Start it, then rerun. The error
+  surfaces as the task's failure note; stderr was streamed live to your
+  terminal.
+- **`usage: nzl run <workflow.yaml>`** — the CLI takes `run` (plus a file
+  path) and `schema` (see the [CLI reference](/docs/reference/cli));
+  anything else is a usage error.
+- **`error: invalid workflow yaml: …` or a list of validator problems** — see
+  the [validity rules](/docs/reference/yaml-reference#validity-rules); a bad file
+  never executes a single task.

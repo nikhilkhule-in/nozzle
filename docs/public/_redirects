@@ -1,0 +1,3 @@
+# Unknown routes load the SPA shell (TanStack router renders its 404 view).
+# Exact asset matches always win over this rewrite.
+/*    /_shell.html    200

@@ -1,0 +1,63 @@
+---
+title: Testing
+description: "The test matrix: core unit tests, runner library tests, CLI integration tests, and the binding smoke tests."
+related:
+  - contrib/setup
+  - dev/architecture
+---
+
+Tests mirror the crate boundary: the core is tested as pure functions, the
+runner as an I/O shell, and the CLI as a black-box binary.
+
+## The matrix
+
+| Layer | Where | Count | Runs against |
+|---|---|---|---|
+| Core unit tests | `core/src/*.rs` `#[cfg(test)]` | 20 | pure functions, no I/O |
+| Runner library tests | `runner/src/scheduler.rs`, `ingest.rs` | 14 | `sh` subprocesses, temp dirs |
+| CLI integration tests | `runner/tests/run_test.rs` | 9 | the compiled `nzl` binary |
+| wasm smoke test | `bindings/wasm/test/smoke.mjs` | — | the wasm-pack build |
+| Python tests | `sdk/python/tests/` | — | the maturin build |
+
+Run everything Rust-side with:
+
+```bash
+just test      # cargo test --workspace
+just clippy    # warnings are errors
+```
+
+## Runner library tests
+
+The scheduler is exercised through its event callback, not its printing:
+tests collect `SchedulerEvent`s into a `Vec<String>` and assert exact
+sequences. This is why `scheduler::run` takes `on_event` instead of writing
+to stdout — the library stays rendering-free, and the reporter in `main` is
+just one consumer of the same stream.
+
+Key scenarios:
+
+- **Ordering** — `linear_workflow_runs_in_dependency_order` asserts the exact
+  `start a, end a, start b, end b` sequence.
+- **Isolation** — a failure blocks downstream tasks but independent branches
+  still run (`failure_blocks_downstream_but_independent_branches_continue`).
+- **Data flow** — upstream stdout reaches downstream `$ENV` (verified by a
+  file the downstream task writes).
+- **Honest failure** — an oversized output fails the producing task with the
+  placement error rather than truncating.
+
+## CLI integration tests
+
+`run_test.rs` uses `env!("CARGO_BIN_EXE_nzl")` to locate the freshly built
+binary, so the tests are hermetic — no `cargo install` needed. They assert
+exit codes (0 on success, 1 on task failure, 2 on usage/ingest errors) and
+summary content on stdout.
+
+## Conventions
+
+- **The core has zero I/O in tests by construction** — there is nothing to
+  mock because there are no effects. If you need a mock to test core logic,
+  the logic leaked into the runner.
+- Runner tests write scratch files under `std::env::temp_dir()` and clean up
+  after themselves.
+- New behavior lands with a test that fails without it; `just clippy` gates
+  the merge the same way `just test` does.

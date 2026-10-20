@@ -1,0 +1,68 @@
+@import 'tailwindcss';
+@import 'fumadocs-ui/css/neutral.css';
+@import 'fumadocs-ui/css/preset.css';
+
+/*
+ * Fonts: vendored upstream releases in docs/public/fonts (OFL — see the
+ * license copies there; fontsource builds would strip OpenType features):
+ * - Inter 4.1: faces are declared by the official rsms stylesheet, vendored
+ *   as fonts/inter.css (byte-identical to https://rsms.me/inter/inter.css
+ *   for the same 4.1 release) with family "InterVariable". Its static
+ *   Inter/InterDisplay fallback bundles are intentionally not vendored;
+ *   with modern engines they never load, and truly old browsers fall
+ *   through to the system stack.
+ * - IBM Plex Mono variable 1.0.0 (IBM/plex) — wght 100-700, ss/salt/ccmp
+ *   feature set: no cv variants and no liga/calt tables
+ */
+
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 100 700;
+  font-display: swap;
+  src: url('/fonts/IBMPlexMonoVariable.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: italic;
+  font-weight: 100 700;
+  font-display: swap;
+  src: url('/fonts/IBMPlexMonoVariable-Italic.woff2') format('woff2');
+}
+
+@theme {
+  --font-sans: 'InterVariable', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, 'Cascadia Mono', monospace;
+  /* Feature settings applied on every surface — sans (via preflight/html) and
+     mono (via preflight/code): ligatures via calt, character variants cv10
+     forced on and cv11 off. Inter defines cv10/cv11 (ligatures via calt);
+     IBM Plex Mono defines none of these features, so the settings no-op
+     there and its own designed defaults apply. */
+  --default-font-feature-settings: 'liga' 1, 'calt' 1, 'cv10' 1, 'cv11' 0;
+  --default-mono-font-feature-settings: 'liga' 1, 'calt' 1, 'cv10' 1, 'cv11' 0;
+}
+
+html {
+  scrollbar-gutter: stable;
+}
+
+/* Docs content uses the full page width: besides uncapping the article
+   (max-w-none on DocsPage), the layout grid's main track is bounded by
+   --fd-layout-width (default 97rem) — raise it so the track stretches to
+   the space left by sidebar and TOC. */
+#nd-docs-layout {
+  --fd-layout-width: 200rem;
+}
+
+/* Roomier TOC/top: the topic-graph panel needs readable text. Must beat the
+   preset's :is(#nd-docs-layout:has(.xl\:layout\[--fd-toc-width\:268px\])) rule,
+   hence :has(#nd-toc) — its specificity is (2,0,0) vs (1,1,0). */
+#nd-docs-layout:has(#nd-toc) {
+  --fd-toc-width: 22rem;
+}
+
+html > body[data-scroll-locked] {
+  margin-right: 0px !important;
+  --removed-body-scroll-bar-size: 0px !important;
+}

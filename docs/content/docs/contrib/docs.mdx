@@ -1,0 +1,70 @@
+---
+title: Writing Docs
+description: "How the docs site is organized, how pages connect, and what to regenerate after content changes."
+related:
+  - contrib/setup
+  - dev/design-decisions
+---
+
+The docs are a [fumadocs](https://fumadocs.dev) site on TanStack Start,
+living in `docs/`. Content is MDX under `docs/content/docs/`, organized into
+four root sections: **User Guide** (`guide/`), **Reference** (`reference/`),
+**Developer's Guide** (`dev/`), and **Contributor's Guide** (`contrib/`).
+Each section is a root
+folder in its `meta.json` (`"root": true`), which is what drives the
+section switcher at the top of the sidebar.
+
+```bash
+just docs                              # dev server at :3000/docs
+pnpm --dir docs run build              # full build + prerender
+pnpm --dir docs run types:check        # stricter than the build
+```
+
+## Page anatomy
+
+Every MDX page has `title`, `description`, and optionally `related`:
+
+```mdx
+---
+title: Execution Semantics
+description: "What the engine guarantees about ordering, failure, and data flow."
+related:
+  - dev/readiness
+  - reference/yaml-reference
+---
+```
+
+- `related:` entries are slugs under `/docs` — they feed the backlinks
+  ("Linked from") panel and the topic graph.
+- Page order inside a section is the `pages` array in that section's
+  `meta.json` — add new pages there or they won't appear in the sidebar.
+
+## The topic graph is generated
+
+The graph (mini panel in the table-of-contents column, full page at
+[/docs/graph](/docs/graph)) is built by `docs/scripts/build-graph.mjs`, which
+walks the MDX files and extracts `/docs/...` links plus `related:`
+frontmatter into `docs/src/lib/graph.json`.
+
+The script runs automatically before `dev` and `build` — you never commit
+edits to `graph.json` by hand, and never hand-write graph edges. If your new
+page doesn't show up in the graph, check that something links to it (or it
+links to something).
+
+## Diagrams and fonts
+
+- Mermaid fenced blocks render client-side via the `Mermaid` component and
+  are theme-aware. Use them sparingly for data flow, not decoration.
+- Fonts (Inter, IBM Plex Mono) are vendored in `docs/public/fonts/` — don't
+  swap them for a CDN link; the site must build offline.
+
+## Generated artifacts — do not hand-edit
+
+| Path | Regenerate with |
+|---|---|
+| `schemas/workflow.schema.json` | `just schema` |
+| `docs/src/lib/graph.json` | automatic (pre-dev/build script) |
+| `docs/.output/public/` | `pnpm --dir docs run build` |
+
+A docs change is complete when `pnpm --dir docs run build` prerenders with
+zero errors and `types:check` passes.

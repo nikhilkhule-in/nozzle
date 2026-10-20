@@ -1,0 +1,78 @@
+---
+title: Design Decisions
+description: "The reasoning behind the workspace shape, the YAML mapping, the data-flow guard, sequential execution, and the pruning."
+---
+
+The engine-on-a-branch MVP was scoped by subtraction: keep the Rust core and
+validate it by *using* it. These are the load-bearing decisions, condensed
+from the change's design record.
+
+## D1: the runner is its own crate, the workspace is minimal
+
+`runner` (`nozzle-run`, bin + lib) path-depends on `core`, and the root
+workspace is `[core, runner]` with both binding packages excluded — each one
+manage its own build flow.
+
+Rejected alternatives:
+
+- **a Python runner over the PyO3 bindings** — drags maturin + venv into
+  every test run and makes the engine's own acceptance pipeline heavier than
+  the engine;
+- **extending `core` with a runner** — breaks its documented no-I/O rule,
+  which is precisely what keeps testability and the wasm/PyO3 binding
+  surfaces harmonized.
+
+## D2: YAML maps onto the graph; commands never enter the core
+
+| YAML | Core |
+|---|---|
+| `name` | `spec.id` |
+| task list | `TaskSpec { name, runtime: "shell" }` |
+| `needs: [a]` | edge, arg `_` |
+| `env: { VAR: a }` | edge, arg `VAR` |
+
+Commands live in the runner-side table. This leaves the core describing *who
+feeds whom*, runnable identically in a shell-executing runner today and by
+any other executor tomorrow.
+
+## D3: stdout is the data-flow medium, guarded at completion
+
+A task's captured stdout (trailing newlines trimmed) becomes downstream env
+values; bound values override ambient variables. The guard is the core's own
+placement logic: `classify(len, Auto, 64 KiB)` at completion time — a `Blob`
+classification **fails the producing task's attempt** (mirroring how a
+blob-without-store cannot be placed), downstream never executes, nothing is
+truncated.
+
+## D4: sequential, first-of-next_ready, no retries
+
+Deterministic replay beats parallelism in an MVP: the loop takes the first
+ready task in definition order, runs it to a terminal state, repeats. No
+retries (`max_attempts` deliberately unread), no per-task timeout (the next
+knob candidates when the runner grows). Failure semantics: downstream drains
+as failed-without-execution; unaffected branches complete; exit 1.
+
+## D5: the demo is a random docker image
+
+`gen-tag` (epoch + 4 random bytes) → `build` (docker build with the tag) →
+`verify` (docker image inspect). The build context is minimal by construction
+(`FROM scratch` + one `COPY`), so the demo measures the *engine*, not docker
+artistry. Randomness makes cached or faked runs impossible to confuse with
+success: two runs must yield two distinct tags.
+
+## D6: prune the orchestration era, own the boundary fix
+
+The branch dropped the Python orchestration scaffolding (`src/nozzle/`,
+python `tests/`, root `pyproject.toml`/`uv.lock`/`.python-version`,
+`ui/sketch/`) and rewrote the README and justfile cargo-centric. While
+pruning, `PlacementPolicy`'s serde casing was fixed to kebab-case on this
+branch (the accepted strings are now `auto` / `inline-only` / `blob-only`),
+with the PyO3 test aligned to it — a user-facing boundary detail that
+belongs to the engine, not to an unneeded change history.
+
+## What was deliberately left out
+
+Blob storage, HTTP orchestration, cancellation, a cross-platform matrix,
+per-task timeouts, retries, predicates in YAML. Each has a natural home in
+the core's existing types — the [api map](/docs/dev/architecture#who-decides-what)
+shows which function each extension would flow through.

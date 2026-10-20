@@ -1,0 +1,103 @@
+---
+title: CLI Reference
+description: "The nzl command: subcommands, exit codes, output format, and usage recipes."
+related:
+  - reference/yaml-reference
+  - reference/schema
+---
+
+`nzl` (package `nozzle-run`) executes a YAML-defined workflow on this
+machine. All I/O lives in the CLI; scheduling decisions come from
+`nozzle-core`. This page is the exhaustive contract — for a guided tour of
+invocation and output, see [Running](/docs/guide/running).
+
+```text
+usage: nzl run <workflow.yaml>
+       nzl schema
+```
+
+## Commands
+
+```tsx
+import { TypeTable } from 'fumadocs-ui/components/type-table';
+
+<TypeTable
+  type={{
+    "nzl run <workflow.yaml>": {
+      type: "subcommand",
+      description:
+        "Load, validate, and execute the workflow. Prints a lifecycle line per task and a closing summary. Returns 0 only if every task succeeded.",
+      default: false,
+    },
+    "nzl schema": {
+      type: "subcommand",
+      description:
+        "Print the JSON Schema (draft 2020-12) for workflow files to stdout, generated from the loader's own Rust types.",
+      default: false,
+    },
+  }}
+/>
+```
+
+Any other invocation prints the usage line to stderr and exits `2`.
+
+## Exit codes
+
+```tsx
+import { TypeTable } from 'fumadocs-ui/components/type-table';
+
+<TypeTable
+  type={{
+    "0": {
+      type: "exit code",
+      description: "Every task reached succeeded.",
+    },
+    "1": {
+      type: "exit code",
+      description:
+        "The run executed but ended FAILED — a task failed, or tasks stayed blocked behind an upstream failure.",
+    },
+    "2": {
+      type: "exit code",
+      description:
+        "Could not run at all: usage error, unreadable file, or invalid workflow (all validation problems are listed on stderr).",
+    },
+  }}
+/>
+```
+
+Scripts should branch on the code, not on parsing stdout.
+
+## Output format
+
+```text
+-> gen-tag: sh -c 'echo "nozzle-$(date +%s)-…"'      # task starting
+<- gen-tag: succeeded in 0.0s                        # task terminal state
+== run 'build-random-image' SUCCEEDED ==             # run summary
+   gen-tag: succeeded in 0.0s
+   build: succeeded in 1.4s (exit status 1)          # note, if any
+```
+
+- `->` lines echo the command exactly as written in the YAML.
+- `<-` lines carry the terminal status, the elapsed span, and an optional
+  note — e.g. `exit status 1`, `cannot spawn: …`, or the placement error for
+  oversized outputs.
+- A task's **stderr is inherited**, so long-running commands (docker build)
+  stream progress live; only stdout is captured for data flow.
+
+## Recipes
+
+```bash
+# run with cargo, no install
+cargo run -p nozzle-run -- run examples/build-random-image.yaml
+
+# install once, then use by name
+cargo install --path runner
+nzl run workflow.yaml
+
+# wire editor completion for workflow files
+nzl schema > schemas/workflow.schema.json
+```
+
+`nzl run` accepts `.yaml`, `.yml`, and `.json` files — JSON is a subset of
+YAML, and one loader serves all three.

@@ -1,0 +1,68 @@
+---
+title: Setup and Build
+description: "Toolchain prerequisites, the just recipes, and how to build and run the engine locally."
+related:
+  - guide/getting-started
+  - contrib/testing
+---
+
+Nozzle is a cargo workspace plus a pnpm docs site. Everything a contributor
+needs is a Rust toolchain, `just`, and (optionally) Docker and Node.
+
+## Prerequisites
+
+| Tool | Needed for | Notes |
+|---|---|---|
+| Rust (stable) | core, runner, both bindings | `rustup` default toolchain is fine |
+| [just](https://github.com/casey/just) | task running | every recipe below is a `just` command |
+| Docker | `run-demo`, integration-style workflows | optional — only the demo needs a daemon |
+| Node 22 + pnpm 12 | docs site | optional — only for `just docs` / doc builds |
+
+## Workspace layout
+
+```text
+Cargo workspace
+├─ core/    package nozzle-core — pure scheduling logic, zero I/O
+└─ runner/  package nozzle-run  — path-depends on core; binary is nzl
+
+bindings/wasm   (wasm-pack; excluded from the workspace)
+sdk/python      (maturin;     excluded from the workspace)
+docs/           (fumadocs site; pnpm workspace)
+schemas/        (generated — never hand-edit)
+```
+
+## Building and running
+
+```bash
+cargo build                  # both workspace crates
+just run-demo                # nzl run examples/build-random-image.yaml
+```
+
+The demo builds a uniquely-tagged docker image through the engine, so it
+needs a running Docker daemon. It exercises the full pipeline: YAML ingest →
+graph validation → sequential execution → stdout-to-env data flow.
+
+## Recipes
+
+| Recipe | What it does |
+|---|---|
+| `just test` | `cargo test --workspace` — all unit and integration tests |
+| `just clippy` | `cargo clippy --workspace --all-targets -- -D warnings` |
+| `just schema` | regenerate `schemas/workflow.schema.json` |
+| `just run-demo` | run the docker-image demo workflow |
+| `just build-wasm` / `just test-wasm` | wasm-pack build + Node smoke test |
+| `just build-py` / `just test-py` | maturin build into a scratch venv + pytest |
+| `just docs` | install docs deps and start the dev server |
+
+## The schema is generated, never hand-maintained
+
+`schemas/workflow.schema.json` is derived from the YAML types in
+`runner/src/model.rs` via `schemars`. If you touch those types, rerun:
+
+```bash
+just schema
+```
+
+The command is byte-deterministic — no churn in diffs beyond your actual
+type change. CI (and `nzl schema`) can regenerate and compare against the
+committed file.

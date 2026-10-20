@@ -1,0 +1,78 @@
+---
+title: The Spec Model
+description: "WorkflowSpec is the contract every definition language compiles to — the pivot between frontends, the engine, and executors."
+related:
+  - dev/architecture
+  - dev/dag
+  - contrib/adding-a-language
+---
+
+Nozzle supports multiple definition languages without the core knowing any of
+them, because **`WorkflowSpec` is the contract between the layers**. A
+definition language is a *frontend*: its only job is to produce a valid spec
+plus a command table.
+
+```text
+YAML file ──┐
+Python SDK ─┤──> WorkflowSpec + BTreeMap<String, TaskDef> ──> scheduler ──> Executor
+JS/TS SDK ──┘         (the pivot)                            (core)       (runner)
+```
+
+## The two artifacts a frontend must produce
+
+```rust
+// core/src/dag.rs — the neutral graph
+pub struct WorkflowSpec {
+    pub id: String,
+    pub language: String,
+    pub tasks: Vec<TaskSpec>,          // names only — no commands
+    pub edges: Vec<Edge>,              // upstream → downstream, with an arg slot
+}
+
+// runner/src/ingest.rs — the commands, keyed by task name
+BTreeMap<String, TaskDef>           // TaskDef { cmd }
+```
+
+The split is deliberate:
+
+- **The spec holds structure, never commands.** Names, edges, and argument
+  slots are semantic; the text of a shell command is an I/O concern of the
+  runner. This is why the core stays free of process APIs and why a future
+  container executor can run the exact same spec.
+- **The command table is runner-side.** `BTreeMap` keeps it deterministic and
+  ordered; `ingest::load` populates it from YAML today. A Python or JS/TS
+  SDK would populate the same table from its builder objects.
+
+## What the edges encode
+
+| YAML | Edge | Meaning |
+|---|---|---|
+| `needs: [a]` | `arg: "_"` | ordering-only dependency (the reserved `ORDER_ARG`) |
+| `env: { V: a }` | `arg: "V"` | data dependency: bind `$V` from `a`'s captured stdout |
+
+One `env` entry is one edge with two jobs — it implies the dependency, so
+authors never state it twice. See [core::dag](/docs/dev/dag) for predicates
+and validation.
+
+## The language/runtime fields
+
+`WorkflowSpec.language` and `TaskSpec.runtime` exist for the multi-language
+future: `language` records which frontend produced the spec, and `runtime`
+names the execution substrate. The YAML runner pins `language: "shell"` and
+leaves commands to `LocalExecutor`; other frontends and executors fill them
+differently without changing the scheduler's behavior.
+
+## Invariants every frontend must preserve
+
+1. **Validity is not optional.** A frontend must run the same two-layer
+   validation the YAML ingest does (parse-level checks, then the core's
+   graph validator) before handing the spec to the scheduler — never emit a
+   spec it has not validated.
+2. **Determinism.** Task order and the command table must be reproducible
+   from the source document — same input, same spec.
+3. **Commands stay out of the core.** Whatever a language calls its command
+   (a string, a script file, a closure reference), it lands in the runner-side
+   table, never in `TaskSpec`.
+
+The reference implementation of all three is the YAML ingest — walk it in
+[Adding a definition language](/docs/contrib/adding-a-language).

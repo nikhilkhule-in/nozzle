@@ -1,0 +1,7 @@
+{
+  "title": "User Guide",
+  "description": "What Nozzle is, how to write workflows in YAML, and how the engine executes them.",
+  "icon": "BookOpen",
+  "root": true,
+  "pages": ["what-is-nozzle", "getting-started", "workflows", "running", "execution-semantics"]
+}

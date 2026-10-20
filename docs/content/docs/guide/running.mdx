@@ -1,0 +1,87 @@
+---
+title: Running
+description: "Running a workflow with nzl: invocation, reading the output, and how data flows between tasks."
+related:
+  - guide/getting-started
+  - guide/workflows/yaml
+  - reference/cli
+---
+
+## Invocation
+
+```bash
+cargo run -p nozzle-run -- run <workflow.yaml>
+# or, with the justfile:
+just run-demo
+# or, once the CLI is installed (`cargo install --path runner`), by name:
+nzl run <workflow.yaml>
+```
+
+The CLI has two subcommands: `run`, which takes a workflow file path, and
+`schema`, which prints the workflow JSON Schema. Anything else prints
+`usage: nzl run <workflow.yaml>` to stderr and exits `2`.
+
+## Exit codes
+
+| Code | Meaning |
+|---|---|
+| `0` | Every task reached `succeeded` |
+| `1` | The run executed but ended `FAILED` (a task failed, or tasks stayed blocked) |
+| `2` | Could not run at all: usage error, unreadable file, or invalid workflow |
+
+Scripts should branch on the code, not on parsing stdout. The
+[CLI reference](/docs/reference/cli) is the exhaustive contract, including
+`nzl schema`.
+
+## Output anatomy
+
+```text
+-> gen-tag: sh -c 'echo "..."'              ← start: the command, verbatim from YAML
+<- gen-tag: succeeded in 0.0s               ← end: terminal state + wall time
+-> build: sh -c 'docker build -t "$IMAGE_TAG" examples/context'
+<- build: succeeded in 1.4s
+-> verify: sh -c 'docker image inspect "$IMAGE_TAG" > /dev/null'
+<- verify: succeeded in 0.1s
+== run 'build-random-image' SUCCEEDED ==    ← verdict line
+   gen-tag: succeeded in 0.0s               ← per-task table, definition order
+   build: succeeded in 1.4s
+   verify: succeeded in 0.1s
+```
+
+Notes on the failure shapes:
+
+```text
+<- a: failed in 0.0s (exit status 3)            ← non-zero exit of the command
+<- big: failed in 0.0s (output of 140000 bytes
+   exceeds inline-only threshold of 65536 bytes) ← data-flow guard tripped
+<- b: failed (blocked by upstream failure)      ← never executed
+```
+
+Important: only `->`/`<-` lines and the summary go to the runner's stdout.
+**Task stderr is inherited**, so whatever the command prints to stderr —
+docker progress, compiler warnings — streams live and unmodified. Task stdout
+is captured, not shown: its job in life is to feed downstream variables.
+
+## Data flow between tasks
+
+For `env: { VAR: upstream }` on a task:
+
+1. When the upstream reaches `succeeded`, its stdout is captured with all
+   trailing newlines (`\n`, `\r\n`) trimmed — exactly one line of shell output
+   becomes one clean variable value.
+2. The variable is injected into the downstream process, **overriding any
+   ambient value** of the same name: bindings win over the environment you
+   invoked `nzl` with.
+3. Optionally, the value is checked against the inline threshold (64 KiB by
+   default). Oversized values are refused outright — see
+   [execution semantics](/docs/guide/execution-semantics#the-size-guard).
+
+Multiple bindings on one task are all injected (each is its own edge), and a
+task may bind from several different upstreams — a fan-in.
+
+## Timing
+
+Durations are wall-clock `Instant` spans around the whole attempt, from just
+before spawning `sh` until exit or placement verdict. Sub-second times print
+like `0.0s`, so treat them as coarse order-of-magnitude lines — the summary is
+for humans, not for benchmarking.

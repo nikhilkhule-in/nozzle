@@ -33,3 +33,8 @@ test-py: build-py
 docs:
     pnpm --dir docs install
     pnpm --dir docs run dev
+
+# Build the docs and deploy to nozzle.nikhilkhule.com (Workers + Access)
+deploy-docs:
+    pnpm --dir docs run build
+    pnpm --dir docs run deploy

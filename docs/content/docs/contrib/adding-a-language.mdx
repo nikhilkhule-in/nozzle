@@ -1,0 +1,84 @@
+---
+title: Adding a Definition Language
+description: "The extension contract for new frontends — Python, JS/TS, or anything else — and the YAML ingest as its reference implementation."
+related:
+  - dev/spec-model
+  - dev/architecture
+  - contrib/testing
+---
+
+A definition language is a frontend that produces two artifacts and hands
+them to the scheduler:
+
+1. a **validated `WorkflowSpec`** — tasks and edges, no commands
+2. a **command table** — `BTreeMap<String, TaskDef>`, runner-side
+
+That is the whole contract. The engine consumes nothing else, which is why
+YAML, a future Python SDK, and a future JS/TS SDK all run identically. See
+[The spec model](/docs/dev/spec-model) for why the split looks this way.
+
+## The reference implementation: YAML ingest
+
+`runner/src/ingest.rs` is the walkthrough for any new frontend. Its flow:
+
+```text
+load_file / load_str      I/O and syntax: read bytes, serde-parse into WorkflowYaml
+        ↓
+load(wf: WorkflowYaml)   semantic mapping — the interesting part
+        ↓
+Loaded { spec, tasks }   the two artifacts, ready for scheduler::run
+```
+
+`load()` does, in order:
+
+1. **Runner-side field checks** — non-empty name, at least one task, non-empty
+   cmds. Collected as `Vec<String>` of `error: …` messages, not exceptions.
+2. **Spec mapping** — one `TaskSpec` per task (`runtime: "shell"` pinned);
+   `needs` → edges with `arg: ORDER_ARG` (`"_"`); each `env: { V: a }` → a
+   data edge with `arg: "V"`. Note the mapping is one-directional and
+   total: every dependency in the YAML appears as an edge, nothing else does.
+3. **Core validation** — the assembled `WorkflowSpec` goes through the core's
+   graph validator (unknown references, self-edges, cycles). Errors are
+   **aggregated**: one bad file reports all of its problems in one list.
+4. **Command table** — `BTreeMap` keyed by task id, so downstream env
+   injection lookups are deterministic.
+
+The tests in the same file (`maps_name_tasks_and_edges`,
+`unknown_dependency_is_reported`, `cycle_is_reported`, …) are the acceptance
+criteria in executable form.
+
+## Checklist for a new frontend
+
+| Step | Requirement |
+|---|---|
+| Parse | Your syntax → your own surface types. Do not reuse `WorkflowYaml` — it is YAML-shaped. |
+| Map | Surface types → `WorkflowSpec` + command table, edges per the table above. |
+| Validate | Run the core's graph validator on the assembled spec before returning it. Aggregate your own field errors the same way. |
+| Test | Port the ingest test scenarios: mapping shape, unknown deps, cycles, duplicates, empty fields. |
+| Document | A page under [Writing workflows](/docs/guide/workflows/yaml), marked planned until it ships. |
+
+Two invariants are non-negotiable: **determinism** (same source, same spec)
+and **commands stay out of the core** (a script file or closure reference
+belongs in the command table, never in `TaskSpec`).
+
+## What you get for free
+
+Because the contract ends at the two artifacts, a new frontend inherits:
+
+- the full validation machinery (aggregated errors, deterministic order),
+- the scheduler's semantics — ordering, failure propagation, the
+  [size guard](/docs/guide/execution-semantics#the-size-guard),
+- every executor behind the `Executor` seam, present and future,
+- the same CLI-level exit codes and summary output if you reuse `scheduler::run`.
+
+## The SDK path
+
+The planned Python and JS/TS SDKs are this contract behind a builder API,
+distributed with their existing core surfaces (`sdk/python/` via PyO3,
+`bindings/wasm/` via wasm-bindgen). A builder constructs the spec in memory
+and calls the same `scheduler::run` — no YAML in sight. When they ship, the
+JS/TS API reference will be generated from types with
+[fumadocs-typescript](https://www.fumadocs.dev/docs/ui/components/auto-type-table),
+and the Python reference from the package with
+[fumadocs-python](https://www.fumadocs.dev/docs/integrations/content/python) —
+generated, never hand-maintained, like everything else in these docs.
