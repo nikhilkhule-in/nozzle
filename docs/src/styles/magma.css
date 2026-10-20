@@ -1,0 +1,75 @@
+@import 'fumadocs-ui/css/lib/default-colors.css';
+
+/*
+ * Magma for Nozzle docs: ember orange (#ff6a3d) glowing through oxblood
+ * rock (#1b0b0a), hottest at the vent. Same token source as the product
+ * page (Magma dark/light): bg, fg, muted text, hairline borders, ember
+ * accents, and ok/bad/amber status colors. Light mode is parchment
+ * (#f6ecea) with kiln-red accents (#c93a1a).
+ */
+
+@theme {
+  --color-fd-background: #f6ecea;
+  --color-fd-foreground: #2a0f0c;
+  --color-fd-muted: #ece1df;
+  --color-fd-muted-foreground: #786360;
+  --color-fd-accent: #e6dad8;
+  --color-fd-accent-foreground: #2a0f0c;
+  --color-fd-secondary: #ece1df;
+  --color-fd-secondary-foreground: #2a0f0c;
+  --color-fd-card: #f6ecea;
+  --color-fd-card-foreground: #2a0f0c;
+  --color-fd-popover: #f6ecea;
+  --color-fd-popover-foreground: #2a0f0c;
+  --color-fd-border: #d9cdcb;
+  --color-fd-primary: #c93a1a;
+  --color-fd-primary-foreground: #ffffff;
+  --color-fd-ring: #c93a1a;
+  --color-fd-overlay: rgba(42, 15, 12, 0.45);
+  --color-fd-info: #e88a1c;
+  --color-fd-success: #1c7a45;
+  --color-fd-warning: #a86100;
+  --color-fd-error: #b3202f;
+  --color-fd-idea: #c93a1a;
+  --color-fd-diff-add: #dcefe3;
+  --color-fd-diff-add-symbol: #1c7a45;
+  --color-fd-diff-remove: #f7dee1;
+  --color-fd-diff-remove-symbol: #b3202f;
+}
+
+.dark {
+  --color-fd-background: #1b0b0a;
+  --color-fd-foreground: #fbeee8;
+  --color-fd-muted: #2b1b1a;
+  --color-fd-muted-foreground: #a69894;
+  --color-fd-accent: #312220;
+  --color-fd-accent-foreground: #fbeee8;
+  --color-fd-secondary: #2b1b1a;
+  --color-fd-secondary-foreground: #fbeee8;
+  --color-fd-card: #241413;
+  --color-fd-card-foreground: #fbeee8;
+  --color-fd-popover: #241413;
+  --color-fd-popover-foreground: #fbeee8;
+  --color-fd-border: #3a2b29;
+  --color-fd-primary: #ff6a3d;
+  --color-fd-primary-foreground: #1b0b0a;
+  --color-fd-ring: #ff6a3d;
+  --color-fd-overlay: rgba(0, 0, 0, 0.6);
+  --color-fd-info: #ffb454;
+  --color-fd-success: #7ad69a;
+  --color-fd-warning: #ffc15a;
+  --color-fd-error: #ff4d5e;
+  --color-fd-idea: #ff6a3d;
+  --color-fd-diff-add: #14301f;
+  --color-fd-diff-add-symbol: #7ad69a;
+  --color-fd-diff-remove: #3d1518;
+  --color-fd-diff-remove-symbol: #ff4d5e;
+}
+
+#nd-sidebar {
+  background-color: #f0e5e3;
+}
+
+.dark #nd-sidebar {
+  background-color: #140807;
+}
