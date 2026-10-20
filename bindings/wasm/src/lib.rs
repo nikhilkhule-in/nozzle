@@ -1,5 +1,5 @@
 //! wasm-bindgen surface over the Rust core for TypeScript consumers
-//! (Cloudflare orchestrator, future JS/TS SDKs).
+//! (future JS/TS SDKs).
 //!
 //! Mirrors the PyO3 surface exactly: JSON-in/JSON-out, no logic beyond
 //! serialization and error translation. All behavior lives in `nozzle-core`.

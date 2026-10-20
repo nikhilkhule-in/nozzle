@@ -59,7 +59,7 @@ def test_classify_and_hash_from_rust():
     assert classify_output(10, "auto", 64) == "inline"
     assert classify_output(64, "auto", 64) == "blob"
     with pytest.raises(ValueError, match="exceeds"):
-        classify_output(64, "inline_only", 64)
+        classify_output(64, "inline-only", 64)
     assert content_hash(b"nozzle") == content_hash(b"nozzle")
     assert len(json.loads(defaults())) == 6
 

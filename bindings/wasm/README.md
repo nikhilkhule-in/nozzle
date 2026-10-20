@@ -1,7 +1,7 @@
 # Nozzle core (WebAssembly)
 
 `nozzle-core` compiled via wasm-bindgen for TypeScript consumers
-(Cloudflare orchestrator, future JS/TS SDKs). Same JSON-in/JSON-out surface
+(future JS/TS SDKs). Same JSON-in/JSON-out surface
 as the PyO3 bindings; no logic lives here.
 
 ```bash

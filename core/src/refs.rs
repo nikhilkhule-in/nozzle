@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 /// Author-declared placement hint for a task's output, recorded at workflow
 /// parse time and enforced at completion time.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
+#[serde(rename_all = "kebab-case")]
 pub enum PlacementPolicy {
     /// System decides by size against the orchestrator's inline threshold.
     #[default]
