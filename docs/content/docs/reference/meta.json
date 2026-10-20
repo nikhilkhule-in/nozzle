@@ -1,7 +1,7 @@
 {
   "title": "Reference",
   "description": "Field-by-field contracts: the YAML format, the nzl CLI, and the generated schema.",
-  "icon": "BookMarked",
+  "icon": "BookBookmark",
   "root": true,
   "pages": ["yaml-reference", "cli", "schema"]
 }
