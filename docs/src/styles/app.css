@@ -57,9 +57,16 @@ html {
 
 /* Roomier TOC/top: the topic-graph panel needs readable text. Must beat the
    preset's :is(#nd-docs-layout:has(.xl\:layout\[--fd-toc-width\:268px\])) rule,
-   hence :has(#nd-toc) — its specificity is (2,0,0) vs (1,1,0). */
-#nd-docs-layout:has(#nd-toc) {
-  --fd-toc-width: 22rem;
+   hence :has(#nd-toc) — its specificity is (2,0,0) vs (1,1,0).
+   Viewport-gated: the TOC aside is `max-xl:hidden`, so below the xl
+   breakpoint it is `display: none` — but :has() still matches (it tests DOM
+   presence, not visibility) and the 22rem grid track would squeeze the
+   article to one word per line on mobile. Only reserve the track when the
+   aside is actually displayed. */
+@media (min-width: 80rem) {
+  #nd-docs-layout:has(#nd-toc) {
+    --fd-toc-width: 22rem;
+  }
 }
 
 html > body[data-scroll-locked] {
