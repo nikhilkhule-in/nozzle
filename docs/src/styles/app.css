@@ -45,6 +45,7 @@
 
 html {
   scrollbar-gutter: stable;
+  scroll-behavior: smooth;
 }
 
 /* Docs content uses the full page width: besides uncapping the article
