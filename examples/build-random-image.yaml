@@ -1,0 +1,13 @@
+# The engine's validation workload: build a uniquely-tagged docker image.
+# Randomness proves real execution — no run can be cached or faked.
+name: build-random-image
+tasks:
+  - id: gen-tag
+    cmd: echo "nozzle-$(date +%s)-$(head -c4 /dev/urandom | od -An -tx1 | tr -d ' \n')"
+  - id: build
+    cmd: docker build -t "$IMAGE_TAG" examples/context
+    needs: [gen-tag]
+    env: { IMAGE_TAG: gen-tag }
+  - id: verify
+    cmd: docker image inspect "$IMAGE_TAG" > /dev/null
+    env: { IMAGE_TAG: gen-tag }
