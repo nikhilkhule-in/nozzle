@@ -1,0 +1,7 @@
+{
+  "title": "Contributor's Guide",
+  "description": "Build, test, and extend the engine — the working contract for changes.",
+  "icon": "Wrench",
+  "root": true,
+  "pages": ["setup", "testing", "docs", "adding-a-language"]
+}

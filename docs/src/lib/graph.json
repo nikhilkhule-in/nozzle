@@ -1,0 +1,388 @@
+{
+  "nodes": [
+    {
+      "id": "contrib/adding-a-language",
+      "title": "Adding a Definition Language",
+      "section": "contrib"
+    },
+    {
+      "id": "contrib/docs",
+      "title": "Writing Docs",
+      "section": "contrib"
+    },
+    {
+      "id": "contrib/setup",
+      "title": "Setup and Build",
+      "section": "contrib"
+    },
+    {
+      "id": "contrib/testing",
+      "title": "Testing",
+      "section": "contrib"
+    },
+    {
+      "id": "dev/architecture",
+      "title": "Architecture",
+      "section": "dev"
+    },
+    {
+      "id": "dev/dag",
+      "title": "core::dag — Graph and Validation",
+      "section": "dev"
+    },
+    {
+      "id": "dev/data-and-config",
+      "title": "core::xcom, refs, config — Data and Knobs",
+      "section": "dev"
+    },
+    {
+      "id": "dev/design-decisions",
+      "title": "Design Decisions",
+      "section": "dev"
+    },
+    {
+      "id": "dev/readiness",
+      "title": "core::readiness — May This Task Start?",
+      "section": "dev"
+    },
+    {
+      "id": "dev/runner",
+      "title": "The Runner, File by File",
+      "section": "dev"
+    },
+    {
+      "id": "dev/spec-model",
+      "title": "The Spec Model",
+      "section": "dev"
+    },
+    {
+      "id": "guide/execution-semantics",
+      "title": "Execution Semantics",
+      "section": "guide"
+    },
+    {
+      "id": "guide/getting-started",
+      "title": "Getting Started",
+      "section": "guide"
+    },
+    {
+      "id": "guide/running",
+      "title": "Running",
+      "section": "guide"
+    },
+    {
+      "id": "guide/what-is-nozzle",
+      "title": "What is Nozzle",
+      "section": "guide"
+    },
+    {
+      "id": "guide/workflows/python",
+      "title": "Python Workflows (Planned)",
+      "section": "guide"
+    },
+    {
+      "id": "guide/workflows/typescript",
+      "title": "JS/TS Workflows (Planned)",
+      "section": "guide"
+    },
+    {
+      "id": "guide/workflows/yaml",
+      "title": "YAML Workflows",
+      "section": "guide"
+    },
+    {
+      "id": "index",
+      "title": "Introduction",
+      "section": "index"
+    },
+    {
+      "id": "reference/cli",
+      "title": "CLI Reference",
+      "section": "reference"
+    },
+    {
+      "id": "reference/schema",
+      "title": "Workflow Schema",
+      "section": "reference"
+    },
+    {
+      "id": "reference/yaml-reference",
+      "title": "YAML Reference",
+      "section": "reference"
+    }
+  ],
+  "edges": [
+    [
+      "contrib/adding-a-language",
+      "dev/spec-model"
+    ],
+    [
+      "contrib/adding-a-language",
+      "guide/workflows/yaml"
+    ],
+    [
+      "contrib/adding-a-language",
+      "guide/execution-semantics"
+    ],
+    [
+      "contrib/adding-a-language",
+      "dev/architecture"
+    ],
+    [
+      "contrib/adding-a-language",
+      "contrib/testing"
+    ],
+    [
+      "contrib/docs",
+      "contrib/setup"
+    ],
+    [
+      "contrib/docs",
+      "dev/design-decisions"
+    ],
+    [
+      "contrib/setup",
+      "guide/getting-started"
+    ],
+    [
+      "contrib/setup",
+      "contrib/testing"
+    ],
+    [
+      "contrib/testing",
+      "contrib/setup"
+    ],
+    [
+      "contrib/testing",
+      "dev/architecture"
+    ],
+    [
+      "dev/architecture",
+      "dev/spec-model"
+    ],
+    [
+      "dev/architecture",
+      "dev/runner"
+    ],
+    [
+      "dev/dag",
+      "dev/readiness"
+    ],
+    [
+      "dev/dag",
+      "dev/runner"
+    ],
+    [
+      "dev/dag",
+      "dev/data-and-config"
+    ],
+    [
+      "dev/data-and-config",
+      "guide/execution-semantics"
+    ],
+    [
+      "dev/design-decisions",
+      "dev/architecture"
+    ],
+    [
+      "dev/readiness",
+      "dev/runner"
+    ],
+    [
+      "dev/runner",
+      "reference/yaml-reference"
+    ],
+    [
+      "dev/spec-model",
+      "dev/dag"
+    ],
+    [
+      "dev/spec-model",
+      "contrib/adding-a-language"
+    ],
+    [
+      "dev/spec-model",
+      "dev/architecture"
+    ],
+    [
+      "guide/execution-semantics",
+      "dev/architecture"
+    ],
+    [
+      "guide/execution-semantics",
+      "guide/workflows/yaml"
+    ],
+    [
+      "guide/execution-semantics",
+      "dev/spec-model"
+    ],
+    [
+      "guide/execution-semantics",
+      "reference/yaml-reference"
+    ],
+    [
+      "guide/getting-started",
+      "guide/workflows/python"
+    ],
+    [
+      "guide/getting-started",
+      "guide/workflows/typescript"
+    ],
+    [
+      "guide/getting-started",
+      "guide/workflows/yaml"
+    ],
+    [
+      "guide/getting-started",
+      "reference/yaml-reference"
+    ],
+    [
+      "guide/getting-started",
+      "guide/running"
+    ],
+    [
+      "guide/getting-started",
+      "guide/execution-semantics"
+    ],
+    [
+      "guide/getting-started",
+      "reference/cli"
+    ],
+    [
+      "guide/getting-started",
+      "guide/what-is-nozzle"
+    ],
+    [
+      "guide/running",
+      "reference/cli"
+    ],
+    [
+      "guide/running",
+      "guide/execution-semantics"
+    ],
+    [
+      "guide/running",
+      "guide/getting-started"
+    ],
+    [
+      "guide/running",
+      "guide/workflows/yaml"
+    ],
+    [
+      "guide/what-is-nozzle",
+      "guide/workflows/yaml"
+    ],
+    [
+      "guide/what-is-nozzle",
+      "reference/cli"
+    ],
+    [
+      "guide/what-is-nozzle",
+      "dev/architecture"
+    ],
+    [
+      "guide/what-is-nozzle",
+      "dev/spec-model"
+    ],
+    [
+      "guide/what-is-nozzle",
+      "guide/getting-started"
+    ],
+    [
+      "guide/workflows/python",
+      "dev/spec-model"
+    ],
+    [
+      "guide/workflows/python",
+      "contrib/adding-a-language"
+    ],
+    [
+      "guide/workflows/python",
+      "guide/workflows/yaml"
+    ],
+    [
+      "guide/workflows/typescript",
+      "contrib/adding-a-language"
+    ],
+    [
+      "guide/workflows/typescript",
+      "guide/workflows/yaml"
+    ],
+    [
+      "guide/workflows/typescript",
+      "dev/spec-model"
+    ],
+    [
+      "guide/workflows/yaml",
+      "reference/yaml-reference"
+    ],
+    [
+      "guide/workflows/yaml",
+      "guide/execution-semantics"
+    ],
+    [
+      "guide/workflows/yaml",
+      "reference/schema"
+    ],
+    [
+      "index",
+      "guide/what-is-nozzle"
+    ],
+    [
+      "index",
+      "reference/yaml-reference"
+    ],
+    [
+      "index",
+      "guide/getting-started"
+    ],
+    [
+      "index",
+      "guide/running"
+    ],
+    [
+      "index",
+      "guide/execution-semantics"
+    ],
+    [
+      "reference/cli",
+      "guide/running"
+    ],
+    [
+      "reference/cli",
+      "reference/yaml-reference"
+    ],
+    [
+      "reference/cli",
+      "reference/schema"
+    ],
+    [
+      "reference/schema",
+      "reference/yaml-reference"
+    ],
+    [
+      "reference/schema",
+      "reference/cli"
+    ],
+    [
+      "reference/schema",
+      "contrib/setup"
+    ],
+    [
+      "reference/yaml-reference",
+      "dev/readiness"
+    ],
+    [
+      "reference/yaml-reference",
+      "guide/workflows/yaml"
+    ],
+    [
+      "reference/yaml-reference",
+      "reference/cli"
+    ],
+    [
+      "reference/yaml-reference",
+      "reference/schema"
+    ]
+  ]
+}

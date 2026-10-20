@@ -1,0 +1,77 @@
+---
+title: Introduction
+description: "Nozzle is a workflows-as-code scheduling engine: declare a workflow in YAML (Python and JS/TS SDKs planned), and the Rust core schedules it in dependency order."
+related:
+  - guide/what-is-nozzle
+  - guide/getting-started
+  - guide/running
+  - guide/execution-semantics
+---
+
+Nozzle is a **workflows-as-code scheduling engine**. You declare a workflow —
+today as YAML, with Python and JS/TS SDKs planned — and the Rust engine runs
+it: one task at a time, in dependency order, piping each task's captured
+stdout into downstream environment variables. Every definition language
+compiles to the same neutral graph, so the engine's semantics are identical
+no matter how the workflow was written. [Why this design](/docs/guide/what-is-nozzle).
+
+```yaml showLineNumbers {3}
+name: build-random-image
+tasks:
+  - id: gen-tag
+    cmd: echo "nozzle-$(date +%s)-$(head -c4 /dev/urandom | od -An -tx1 | tr -d ' \n')"
+  - id: build
+    cmd: docker build -t "$IMAGE_TAG" examples/context
+    needs: [gen-tag]
+    env: { IMAGE_TAG: gen-tag }
+```
+
+Running it builds a uniquely-tagged docker image through the engine — the
+engine's first real job, and its validation: you can read the schedules all
+you want, a fresh image tag in your docker daemon is the proof.
+
+## What lives where
+
+| Path | Package | Role |
+|---|---|---|
+| `core/` | `nozzle-core` | Pure scheduling logic: DAG validation, readiness, states, result envelopes. No I/O whatsoever. |
+| `runner/` | `nozzle-run` | The CLI engine (`nzl`): loads a YAML workflow, validates it against the core, executes tasks as `sh -c` subprocesses. |
+| `bindings/wasm/` | — | wasm-bindgen surface over the core for TypeScript consumers. Built by wasm-pack, excluded from the cargo workspace. |
+| `sdk/python/` | — | PyO3 surface over the core for Python consumers. Built by maturin, excluded from the cargo workspace. |
+
+## Design principles
+
+1. **The core makes decisions, the runner does I/O.** `nozzle-core` contains
+   zero file, process, or network APIs. Every semantic question — is this
+   graph valid, which tasks may start, does this output fit inline — is
+   answered by a core function. The runner only translates between operating
+   system reality (processes, environment variables, exit codes) and core
+   concepts (names, statuses, byte sizes).
+2. **YAML maps onto the core's graph without leaking into it.** Commands never
+   enter the core. `needs` and `env` become dependency edges; the YAML shape
+   is describe in [the YAML reference](/docs/reference/yaml-reference).
+3. **Failure is honest.** Tasks print lifecycle lines, the run summary names
+   every task, and the process exits zero only if every task succeeded.
+
+<Cards>
+  <Card
+    title="User Guide"
+    description="What Nozzle is, write workflows in YAML, understand execution."
+    href="/docs/guide/what-is-nozzle"
+  />
+  <Card
+    title="Reference"
+    description="The YAML format, the nzl CLI, and the generated schema — field by field."
+    href="/docs/reference/yaml-reference"
+  />
+  <Card
+    title="Developer's Guide"
+    description="The spec model, the scheduler core, and the runner, file by file."
+    href="/docs/dev/architecture"
+  />
+  <Card
+    title="Contributor's Guide"
+    description="Setup, testing, docs, and adding a definition language."
+    href="/docs/contrib/setup"
+  />
+</Cards>

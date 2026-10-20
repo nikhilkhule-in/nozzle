@@ -1,3 +1,7 @@
+# Rust-generated files
+target/
+bindings/wasm/pkg/
+
 # Python-generated files
 __pycache__/
 *.py[oc]
@@ -8,3 +12,6 @@ wheels/
 
 # Virtual environments
 .venv
+
+# Compiled extensions
+*.so

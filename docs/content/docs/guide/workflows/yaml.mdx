@@ -1,0 +1,106 @@
+---
+title: YAML Workflows
+description: "Patterns for authoring workflows in YAML: pipelines, data flow, fan-out, and multi-stage builds."
+related:
+  - reference/yaml-reference
+  - guide/execution-semantics
+---
+
+A workflow is one YAML document: a name and a list of tasks, each a shell
+command with optional dependencies. This page covers the authoring patterns;
+[the YAML reference](/docs/reference/yaml-reference) has the field-by-field
+rules.
+
+```yaml showLineNumbers
+name: build-random-image
+tasks:
+  - id: gen-tag
+    cmd: echo "nozzle-$(date +%s)-$(head -c4 /dev/urandom | od -An -tx1 | tr -d ' \n')"
+  - id: build
+    cmd: docker build -t "$IMAGE_TAG" examples/context
+    needs: [gen-tag]
+    env: { IMAGE_TAG: gen-tag }
+  - id: verify
+    cmd: docker image inspect "$IMAGE_TAG" > /dev/null
+    env: { IMAGE_TAG: gen-tag }
+```
+
+## Pattern: linear pipeline
+
+List tasks with `needs` to force order. The engine takes ready tasks in
+definition order, so a straight line is just:
+
+```yaml
+tasks:
+  - id: fetch
+    cmd: ./fetch.sh
+  - id: compile
+    cmd: make
+    needs: [fetch]
+  - id: test
+    cmd: make test
+    needs: [compile]
+```
+
+## Pattern: data flow through stdout
+
+A task's captured stdout (trailing newlines trimmed) is its *output*. A
+downstream task binds it with `env: { VAR: upstream-id }` and reads `$VAR`:
+
+```yaml
+tasks:
+  - id: gen-tag
+    cmd: echo "nozzle-$(date +%s)"
+  - id: build
+    cmd: docker build -t "$IMAGE_TAG" .
+    env: { IMAGE_TAG: gen-tag }
+```
+
+Two rules worth internalizing:
+
+- **`env` implies a dependency.** `build` has no `needs`, but it still runs
+  after `gen-tag` — one binding is one edge with two jobs (ordering +
+  injection).
+- **Bindings override ambient variables.** If `$IMAGE_TAG` exists in your
+  shell, the binding still wins inside the task.
+
+Outputs are guarded: stdout up to 64 KiB flows inline; anything larger fails
+the producing task rather than truncating — see
+[execution semantics](/docs/guide/execution-semantics#the-size-guard).
+
+## Pattern: fan-out and fan-in
+
+Independent tasks run as soon as they are ready; a fan-in task names every
+upstream it needs:
+
+```yaml
+tasks:
+  - id: lint
+    cmd: cargo clippy
+  - id: unit
+    cmd: cargo test --lib
+  - id: report
+    cmd: ./report.sh
+    needs: [lint, unit]
+```
+
+A failure in `lint` blocks `report` but **not** `unit` — failure propagates
+downstream only, and independent branches still run to completion.
+
+## Editor validation
+
+The format has a generated JSON Schema. Add one line to get completion and
+hover docs in any YAML editor:
+
+```yaml
+# yaml-language-server: $schema=../schemas/workflow.schema.json
+name: my-workflow
+```
+
+See [the schema page](/docs/reference/schema) for what the schema does and
+does not check.
+
+<Callout type="info" title="One schema, two syntaxes">
+  JSON is a subset of YAML, so the same schema and the same loader serve
+  `.yaml`, `.yml`, and `.json` files.
+</Callout>

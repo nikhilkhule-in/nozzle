@@ -1,0 +1,85 @@
+---
+title: core::readiness — May This Task Start?
+description: "TaskView snapshots, the four readiness outcomes, edge-satisfaction mechanics, and next_ready's definition-order contract."
+---
+
+## The input format: `TaskView`
+
+The core never inspects a live process; it looks at **snapshots** the caller
+assembles:
+
+```rust
+pub struct TaskView&lt;'a&gt; {
+    pub name: &amp;'a str,
+    pub status: TaskStatus,
+    pub output: Option&amp;&amp;'a serde_json::Value&gt;, // materialized upstream value
+}
+```
+
+The runner builds one `Vec` of these fresh on every loop iteration — the
+closure capture rules keep the loop simple, and the core stays stateless.
+`output` is required only for predicate evaluation against succeeded
+upstreams; the runner currently passes `None` everywhere since YAML has no
+predicates (see `core/src/`).
+
+## The four readiness states
+
+```rust
+pub enum Readiness {
+    Ready,        // every edge satisfied, at least one supplies an input
+    Waiting,      // some predecessor is not terminal yet
+    Blocked,      // some predecessor failed
+    ShouldSkip,   // all predecessors terminal but none supplies inputs
+}
+```
+
+## How `readiness()` walks the edges
+
+For one queued task, it iterates over all edges whose `downstream == task`,
+classifying each upstream:
+
+| Upstream's state | Edge predicate | Result for this edge |
+|---|---|---|
+| succeeded | absent | **satisfied** |
+| succeeded | matches its materialized output | **satisfied** |
+| succeeded | mismatch | supplies nothing (branch not taken) |
+| skipped | any | supplies nothing |
+| failed | any | `Blocked` — wins over everything |
+| queued / running | any | `Waiting` |
+
+After the walk: saw at least one satisfied edge ⇒ `Ready`; all-terminal-but-no
+supplier ⇒ `ShouldSkip`.
+
+<Callout type="info" title="A mismatching predicate is not an error">
+  Mismatches and skipped predecessors produce *no input*. A task with multiple
+  branch edges becomes ready if **any** branch actually supplies inputs; only
+  if zero branches do is it marked skipped itself — the correct behavior for a
+  conditional join (`join_runs_when_one_path_supplies_inputs` /
+  `join_skips_when_all_paths_skipped` in the core's own test suite).
+</Callout>
+
+## `next_ready()` — the claimable set
+
+```rust
+pub fn next_ready(tasks: &amp;[TaskView], edges: &amp;[Edge]) -&gt; Vec&lt;String&gt;
+```
+
+Three filters compose:
+
+1. **status == queued only** — running/terminal tasks are never returned;
+2. **no incoming edges ⇒ always ready** (entry tasks, line 78);
+3. otherwise, `readiness() == Ready`.
+
+Order matters and is contractual: the output preserves the caller's slice
+order, which is **definition order**. The runner's promise of deterministic,
+definition-order picking ("first of `next_ready`") is inherited from here,
+not implemented in runner code.
+
+## Where the runner drives it
+
+`scheduler` rebuilds the `TaskView` snapshot per iteration and takes
+`next_ready(...).first()`. The blocked-drain arm of that loop leans on this
+module's guarantees — `Waiting` can never explain an empty `next_ready` when a
+queued task with a *pending* (not failed) ancestry remains, because that
+pending ancestor itself would be claimable. Hence
+[`the drain is sound`](/docs/dev/runner#the-none-arm-the-blocked-drain).

@@ -1,0 +1,55 @@
+---
+title: Python Workflows (Planned)
+description: "The planned Python SDK: define workflows in Python, run them on the same engine."
+related:
+  - guide/workflows/yaml
+  - dev/spec-model
+  - contrib/adding-a-language
+---
+
+<Callout type="warn" title="Planned — not shipped">
+  There is no Python workflow SDK yet. This page describes the design
+  direction so you can see where Nozzle is going and where the seams are.
+  The YAML format is the only shipped definition language.
+</Callout>
+
+The goal: define a workflow as a Python program, and hand the engine the same
+`WorkflowSpec` a YAML file would produce. The engine neither knows nor cares
+which language built the graph — that is the [spec model](/docs/dev/spec-model).
+
+## What exists today
+
+`sdk/python/` is a PyO3 surface over `nozzle-core`: it already exposes the
+core's pure functions (graph validation, readiness) to Python. What it does
+not have yet is the *assembly* layer — a fluent builder that turns Python
+objects into a `WorkflowSpec` and feeds the runner.
+
+## Design direction
+
+The demo workflow as a builder sketch (illustrative, not an API):
+
+```python
+from nozzle import Workflow
+
+wf = Workflow("build-random-image")
+gen = wf.task("gen-tag", cmd='echo "nozzle-$(date +%s)"')
+wf.task("build", cmd="docker build -t $IMAGE_TAG .", env={"IMAGE_TAG": gen})
+
+wf.run()  # same scheduler, same LocalExecutor, same summary output
+```
+
+Key commitments, unchanged from the YAML story:
+
+- **Same spec, same semantics.** A Python-built graph validates identically;
+  `env` implies a dependency; oversized outputs fail their producer.
+- **Same executors.** Tasks still shell out through the configured executor —
+  Python defines workflows, it does not become the execution substrate.
+- **Programmatic advantages.** Loops and comprehensions generate tasks
+  (`wf.task(f"shard-{i}", ...)`), something static YAML cannot do.
+
+## Where the work lives
+
+The extension contract — what a frontend must produce and how the YAML
+ingest does it today — is documented in
+[Adding a definition language](/docs/contrib/adding-a-language). The Python
+SDK is that contract, dressed in a builder API.

@@ -1,0 +1,11 @@
+{
+  "yaml.schemas": {
+    "schemas/workflow.schema.json": ["examples/**/*.yaml", "examples/**/*.yml"]
+  },
+  "json.schemas": [
+    {
+      "fileMatch": ["examples/**/*.json"],
+      "url": "./schemas/workflow.schema.json"
+    }
+  ]
+}

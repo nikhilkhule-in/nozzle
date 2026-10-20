@@ -1,0 +1,95 @@
+---
+title: core::xcom, refs, config — Data and Knobs
+description: "How outputs are classified (and refused) between tasks, where placement policies live, and what each tuning default means."
+---
+
+## `xcom::classify` — the placement decision
+
+Three arguments, one decision:
+
+```rust
+pub fn classify(
+    size_bytes: u64,
+    policy: PlacementPolicy,
+    inline_threshold: u64,
+) -&gt; Result&lt;Classification, PlacementError&gt;
+```
+
+| policy | size under threshold | size at/over threshold |
+|---|---|---|
+| `auto` | `Inline` | `Blob` |
+| `inline-only` | `Inline` | **error** `TooLarge` |
+| `blob-only` | `Blob` | `Blob` |
+
+`Classification` names *where an encoded output belongs* — inline (embedded
+in the task record) versus blob (object store + reference). The runner
+never places blobs (no store), so a `Blob` under `auto` means *this value
+cannot honestly flow here* — [fail the attempt](/docs/guide/execution-semantics#the-size-guard),
+never truncate.
+
+The error carries structured fields and self-formats:
+
+```text
+output of 140000 bytes exceeds inline-only threshold of 65536 bytes
+```
+
+One size comparison decides: the runner re-requests the same classification
+under `inline-only` when it wants to *surface* that error as a task's
+failure note. Same rule, same message, one author.
+
+## `xcom::content_hash` — integrity anchoring
+
+```rust
+pub fn content_hash(bytes: &amp;[u8]) -&gt; String   // hex-encoded SHA-256
+```
+
+At MVP scale it is unused (the runner passes raw strings between processes),
+but it is the primitive a blob-reference envelope would carry
+(backend, key, size, hash). It is test-covered (`hash_is_stable_hex`) so any
+future consumer can lean on stability.
+
+## `refs` — who promises an output, under what policy
+
+```rust
+pub enum PlacementPolicy {
+    #[default] Auto,        // serde: "auto"
+    InlineOnly,             // serde: "inline-only"
+    BlobOnly,               // serde: "blob-only"
+}
+
+pub struct OutputRef {
+    pub task: String,       // a parse-time promise: this task *will* produce
+    pub policy: PlacementPolicy, // an output governed by this policy
+}
+```
+
+The kebab-case serde naming is a deliberate **boundary decision** (made on
+this branch): user-facing strings read `inline-only`, matching how the
+YAML-facing world speaks. The binding surfaces parse policy strings with
+serde, so the accepted spellings changed with this one attribute — verified
+in both the PyO3 (`classify_output(64, "inline-only", …)`) and wasm tests.
+
+The runner currently passes `PlacementPolicy::Auto` (the default) for every
+check; YAML has no `policy:` field yet.
+
+## `config::Defaults` — the recorded knobs
+
+```rust
+pub struct Defaults {
+    poll_interval_secs: u64,        // 10
+    heartbeat_secs: u64,            // 15
+    lease_secs: u64,                // 60
+    max_attempts: u32,              // 3
+    inline_threshold_bytes: u64,    // 64 KiB
+    max_blob_bytes: u64,            // 10 MiB
+}
+```
+
+Usage today: exactly one knob is load-bearing — `inline_threshold_bytes`,
+read by the runner loop when guard-checking captured stdout.
+
+The other five are orchestration-era knobs (poll/lease/heartbeat are about
+workers claiming work; `max_attempts` is retry depth; `max_blob_bytes` would
+gate upload size). They are retained with their recorded MVP values and a
+test (`defaults_match_recorded_mvp_values`) pins them so a drift elsewhere
+cannot silently change semantics. Revisit them when a second runtime arrives.

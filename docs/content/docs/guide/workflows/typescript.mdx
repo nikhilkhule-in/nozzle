@@ -1,0 +1,53 @@
+---
+title: JS/TS Workflows (Planned)
+description: "The planned JS/TS SDK: define workflows in TypeScript, run them on the same engine."
+related:
+  - guide/workflows/yaml
+  - dev/spec-model
+  - contrib/adding-a-language
+---
+
+<Callout type="warn" title="Planned — not shipped">
+  There is no JS/TS workflow SDK yet. This page describes the design
+  direction. The YAML format is the only shipped definition language.
+</Callout>
+
+The goal: define a workflow in TypeScript, and hand the engine the same
+`WorkflowSpec` a YAML file would produce. `bindings/wasm/` is the seed — a
+wasm-bindgen surface over `nozzle-core` that already lets TypeScript call the
+core's pure scheduling functions (graph validation, readiness) via
+`wasm-pack`.
+
+## Design direction
+
+The demo workflow as a builder sketch (illustrative, not an API):
+
+```ts
+import { Workflow } from "@nozzle/core";
+
+const wf = new Workflow("build-random-image");
+const gen = wf.task("gen-tag", { cmd: 'echo "nozzle-$(date +%s)"' });
+wf.task("build", {
+  cmd: "docker build -t $IMAGE_TAG .",
+  env: { IMAGE_TAG: gen },
+});
+
+await wf.run(); // same scheduler, same LocalExecutor, same summary output
+```
+
+Key commitments, identical to the planned Python SDK:
+
+- **Same spec.** The graph validates identically; `env` implies a dependency;
+  outputs are guarded by the same 64 KiB inline threshold.
+- **Same engine.** The wasm surface wraps `nozzle-core` — scheduling
+  semantics cannot drift between languages.
+- **Type-safe references.** `wf.task` returns a handle, so `env` values are
+  checked against real task ids at author time — a class of typo the YAML
+  format catches only at load.
+
+## Where the work lives
+
+The extension contract is documented in
+[Adding a definition language](/docs/contrib/adding-a-language). When the SDK
+ships, its API reference will be generated from the TypeScript types rather
+than hand-written.

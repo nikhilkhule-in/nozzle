@@ -1,0 +1,5 @@
+[workspace]
+members = ["core", "runner"]
+exclude = ["bindings/wasm", "sdk/python"]
+
+resolver = "2"

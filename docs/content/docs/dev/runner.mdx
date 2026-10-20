@@ -1,0 +1,165 @@
+---
+title: The Runner, File by File
+description: "A deep tour of nozzle-run: model, ingest, the execution loop, and the binary — with the borrow-conscious choices called out."
+---
+
+`runner/` is four small files plus one integration test. Read it in the order
+data flows: `model` (what YAML deserializes into) → `ingest` (how YAML becomes
+graph + table) → `scheduler` (how graph + table becomes a run) → `main` (how a run
+becomes output and an exit code).
+
+## `model.rs` — the YAML surface
+
+```rust
+pub struct WorkflowYaml {
+    pub name: String,
+    pub tasks: Vec<TaskYaml>,
+}
+
+pub struct TaskYaml {
+    pub id: String,
+    pub cmd: String,
+    pub needs: Vec<String>,              // #[serde(default)]
+    pub env: BTreeMap<String, String>,   // #[serde(default)] var → upstream id
+}
+```
+
+Notable choices:
+
+- `needs`/`env` are `#[serde(default)]`, matching the guide's rule that they
+  are optional — the *first* time a malformed file surfaces an error is the
+  YAML parse, not a Rust panic.
+- `env` is a `BTreeMap`, so multi-binding injection order and validation
+  order are deterministic run over run (iteration sorted by key).
+
+## `ingest.rs` — YAML text to validated shapes
+
+Three entry points share one core conversion:
+
+- `load_file(path)` reads the file — the **only** filesystem call in the
+  whole crate.
+- `load_str(text)` parses with `serde_yaml` (a parse failure becomes one
+  problem in the list, not a panic).
+- `load(WorkflowYaml)` builds the two-layer world and validates it.
+
+The conversion (`load`, ~40 lines):
+
+| YAML | produces |
+|---|---|
+| `name` | `spec.id` (empty → problem `workflow name must not be empty`) |
+| each task | `TaskSpec { name, runtime: "shell" }` + a `TaskDef` in the table |
+| `needs: [a]` | `Edge { upstream: a, downstream: id, arg: ORDER_ARG ("_") }` |
+| `env: { VAR: a }` | `Edge { upstream: a, downstream: id, arg: "VAR" }` |
+
+`ORDER_ARG = "_"` is the reserved sentinel distinguishing *ordering-only*
+edges from *data-flow* edges. Because commands live only in the table, the
+core validates a graph with no strings that could execute anything.
+
+Then the runner's own checks (empty id/cmd, no tasks) and the core's
+`dag::validate(&spec)` run — and their problem lists are **concatenated**:
+
+```rust
+if let Err(core_errors) = nozzle_core::dag::validate(&spec) {
+    problems.extend(core_errors);
+}
+```
+
+so a bad file surfaces every problem at once, which is what
+[the guide](/docs/reference/yaml-reference#validity-rules) promises.
+
+## `scheduler.rs` — the execution loop
+
+Entry point signature, worth reading as a sentence:
+
+```rust
+pub fn run(
+    spec: &WorkflowSpec,                          // the graph (core types)
+    tasks: &BTreeMap<String, TaskDef>,            // the commands (runner types)
+    on_event: &mut dyn FnMut(SchedulerEvent<'_>), // live progress push
+    executor: Option<Box<dyn Executor>>,          // execution backend
+) -> RunOutcome                                   // full confirmation at the end
+```
+
+The whole run is one `loop` with two arms:
+
+```rust
+match ready.first() {
+    Some(name) => { /* run one task end to end */ }
+    None       => { /* drain: everyone terminal, or everything left is blocked */ }
+}
+```
+
+### The `Some` arm: one attempt
+
+1. `spawn(def, spec, name, &outputs)` — **the only `std::process` call**:
+   - `Command::new("sh")`, `arg("-c").arg(&def.cmd)`,
+   - stdout piped, stderr inherited (so docker progress streams live),
+   - for each incoming data-flow edge (`e.downstream == name && e.arg != "_"`),
+     `cmd.env(&e.arg, outputs[upstream])` — `.env` overrides ambient variables,
+2. verdict on the captured stdout:
+   - exit non-zero → `Err("exit status N")`,
+   - else if the task feeds any env edge (`consumes_output`) →
+     `xcom::classify(len, Auto, threshold)`; `Blob` → the task **fails its
+     attempt** with the placement error (an honest failure, never a truncation),
+   - `Ok(value)` → record into `outputs`.
+3. emit `SchedulerEvent::TaskFinished`; keep the elapsed span and the optional note.
+
+A subtle trick in `placement_error()`: it re-runs `classify` under the
+`InlineOnly` policy, which is guaranteed to produce the same
+`PlacementError::TooLarge` — so the error text the user sees is authored by
+the core (`output of N bytes exceeds inline-only threshold of M bytes`), not
+by the runner. One source of truth for the wording.
+
+### The `None` arm: the blocked drain
+
+When `next_ready` returns nothing but queued tasks remain:
+
+- they cannot be *waiting* — some predecessor would then still be ready, and
+  `next_ready` would have returned something;
+- they cannot be *skippable* — YAML has no predicates;
+- hence every one is blocked behind a failure → mark `failed`, note
+  `blocked by upstream failure`, **without executing it**.
+
+Note the check `!path.exists()`-style guarantee in the tests: a task marked
+blocked never ran its command.
+
+### Housekeeping details
+
+- `status` is a `BTreeMap<String, TaskStatus>` with **owned** keys — an early
+  draft borrowed `&str` from loop-locals (`ready`, `stuck`) and the borrow
+  checker rightly refused: the map outlives each iteration.
+- `output: None` is passed into every `TaskView`: YAML has no predicates, so
+  the core never needs materialized values for gating.
+- `RunOutcome.tasks` is built **in definition order** at the end from the
+  `status`/`elapsed`/`notes` maps — summary stability for humans.
+- Run status is a fold: every task `succeeded` ⇒ `RunStatus::Succeeded`,
+  else `Failed`.
+
+## `main.rs` — presentation only
+
+- Argument match: exactly `[run, path]`; otherwise usage + exit 2.
+- `ingest::load_file` errors print as one `error: …` line each → exit 2.
+- A tiny reporter closure turns `Event`s into the `->` / `<-` lifecycle lines.
+- After the loop, the `== run … ==` verdict and the per-task table.
+- Exit codes: `0` succeeded, `1` failed, `2` invalid.
+
+The callback (instead of printing inside `scheduler::run`) keeps the library
+rendering-free: integration tests collect the same events into a
+`Vec<String>` and assert exact sequences — including a failure of `b` *never
+starting*.
+
+## Tests and where they bite
+
+| Test | Asserts |
+|---|---|
+| `linear_workflow_runs_in_dependency_order` | event sequence `start a, end a, start b, end b` |
+| `upstream_stdout_flows_to_downstream_env` | downstream writes `$IMAGE_TAG` to a file; ambient override |
+| `failure_blocks_downstream_but_independent_branches_continue` | `a` failed(3), `b` blocked-never-ran, `c` succeeded, run failed |
+| `oversized_upstream_output_is_reported_as_size_error` | 140 KB producer fails with "exceeds"; downstream file never created |
+| `binary_exit_code_and_summary_reflect_the_run` | via `CARGO_BIN_EXE_nzl`: exit 0 + summary content; exit 1 on failure |
+| `maps_name_tasks_and_edges` (+5 ingest unit tests) | mapping shape and every validation message |
+| `trims_trailing_newlines_only`, `oversized_output_fails_the_attempt` | trimming corner cases; library-level guard |
+
+To add behavior, the sequence is usually: write the integration test first
+(they read like specifications), then decide which side — core or runner —
+should own the new rule, and place it accordingly.

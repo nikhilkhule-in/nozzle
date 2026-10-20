@@ -1,0 +1,7 @@
+{
+  "title": "Developer's Guide",
+  "description": "The engine internals: the spec model, scheduler core, and the runner, file by file.",
+  "icon": "Cpu",
+  "root": true,
+  "pages": ["architecture", "spec-model", "runner", "dag", "readiness", "data-and-config", "design-decisions"]
+}

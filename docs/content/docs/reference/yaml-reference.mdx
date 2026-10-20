@@ -1,0 +1,171 @@
+---
+title: YAML Reference
+description: "Every field a workflow file may contain, how each maps onto the scheduler graph, and the exact validity rules."
+related:
+  - guide/workflows/yaml
+  - reference/cli
+  - reference/schema
+---
+
+A workflow is one YAML document: a name plus a list of shell tasks. The
+reference example, `examples/build-random-image.yaml`:
+
+```yaml showLineNumbers {6-7}
+name: build-random-image
+tasks:
+  - id: gen-tag
+    cmd: echo "nozzle-$(date +%s)-$(head -c4 /dev/urandom | od -An -tx1 | tr -d ' \n')"
+  - id: build
+    cmd: docker build -t "$IMAGE_TAG" examples/context
+    needs: [gen-tag]
+    env: { IMAGE_TAG: gen-tag }
+  - id: verify
+    cmd: docker image inspect "$IMAGE_TAG" > /dev/null
+    env: { IMAGE_TAG: gen-tag }
+```
+
+## Workflow fields
+
+```tsx
+import { TypeTable } from 'fumadocs-ui/components/type-table';
+
+<TypeTable
+  type={{
+    name: {
+      type: 'string',
+      required: true,
+      description:
+        "Becomes the workflow id. Shown in the run summary (`== run 'name' … ==`). Must be non-empty.",
+    },
+    tasks: {
+      type: 'list',
+      required: true,
+      description:
+        'The tasks, in definition order. The engine picks among ready tasks in this order. An empty list is rejected.',
+    },
+  }}
+/>
+```
+
+## Task fields
+
+```tsx
+import { TypeTable } from 'fumadocs-ui/components/type-table';
+
+<TypeTable
+  type={{
+    id: {
+      type: 'string',
+      required: true,
+      description:
+        "Unique within the workflow. Used by other tasks' `needs`/`env` and in output.",
+    },
+    cmd: {
+      type: 'string',
+      required: true,
+      description:
+        "The shell command, run as `sh -c '<cmd>'` with your default environment. Must be non-empty.",
+    },
+    needs: {
+      type: 'list of ids',
+      required: false,
+      description:
+        'Ordering dependencies: each id holds this task back until that upstream is terminal.',
+      default: '[]',
+    },
+    env: {
+      type: 'map of var → id',
+      required: false,
+      description:
+        'Data dependencies: each entry declares `VAR` bound from an upstream task\'s captured stdout, **and** implies a dependency on it.',
+      default: '{}',
+    },
+  }}
+/>
+```
+
+Two things deserve emphasis:
+
+1. **`env` implies a dependency.** `verify` above has no `needs`, but its
+   `env: { IMAGE_TAG: gen-tag }` makes it run after `gen-tag` anyway. One
+   binding = one edge with two jobs (ordering + value injection).
+2. **`needs` and `env` are different edge kinds under the hood.** Ordering-only
+   edges carry the reserved arg `_`; data edges carry the variable name as the
+   edge arg. `needs: [gen-tag]` plus `env: { X: gen-tag }` on one task is
+   legal — it creates two edges.
+
+## What a task's stdin looks like
+
+Nothing exotic: the command runs as if you typed it into your shell, with your
+ambient variables plus the injected bindings. `sh` (POSIX) is the interpreter
+for every task in the current version.
+
+## Validity rules
+
+Validation is two-layered and **aggregated**: every problem is reported in one
+list, on stderr, prefixed `error:`, and the process exits with code `2`
+before any task runs.
+
+Malformed YAML or missing required fields produce a single serde parse error:
+
+```text
+error: invalid workflow yaml: missing field `id` at line 4 column 5
+```
+
+Structurally valid files then get semantic checks, from both the runner and
+the core's graph validator:
+
+| Message | Source | Trigger |
+|---|---|---|
+| `workflow name must not be empty` | runner | `name: ""` |
+| `workflow declares no tasks` | runner | `tasks: []` |
+| `task x declares an empty cmd` | runner | `cmd: ""` |
+| `task name must not be empty` | core | empty `id` |
+| `duplicate task name: a` | core | two tasks with the same `id` |
+| `edge references unknown upstream: ghost` | core | `needs`/`env` naming a nonexistent id |
+| `edge references unknown downstream: x` | core | (possible only via the core API, not YAML) |
+| `self-edge on task: a` | core | `env: { V: a }` on task `a` |
+| `workflow graph contains a cycle` | core | mutual `needs` |
+
+<Callout type="info" title="Fix everything, then rerun">
+  The validation list is complete, not fail-fast: one bad file reports all of
+  its problems at once, in a deterministic order.
+</Callout>
+
+## Schema for editors and tools
+
+The workflow format has a machine-readable contract, and it is *generated*,
+never hand-maintained: `nzl schema` (wrapped by `just schema`) prints
+the JSON Schema derived from the loader's own Rust types in
+`runner/src/model.rs`, so the schema cannot drift from what the engine
+accepts. The checked-in `schemas/workflow.schema.json` is that output; rerun
+`just schema` whenever the format changes.
+
+That file is a JSON Schema (draft 2020-12) covering the whole format for
+YAML and JSON documents alike — JSON is a subset of YAML, so one schema and
+one loader serve `.yaml`, `.yml`, and `.json`. To light it up in an editor,
+add a header comment to any workflow file:
+
+```yaml
+# yaml-language-server: $schema=../schemas/workflow.schema.json
+name: my-workflow
+```
+
+A repo checkout wires it automatically: `.vscode/settings.json` maps the
+schema to `examples/**`.
+
+One honesty note about coverage: the schema mirrors the loader's field
+checks (non-blank `name`/`id`/`cmd`, at least one task, `env` values must be
+strings). Unknown fields pass through unchecked — the loader currently
+ignores them, and the generated schema reflects that same tolerance.
+Uniqueness of task ids, existence of `needs`/`env` targets, and cycles are
+**runtime validations**, not schema checks — cross-references between task
+ids cannot be expressed in a JSON Schema.
+
+## Deliberate omissions in this format
+
+The core graph supports more than YAML exposes today: branch predicates
+(`evaluate_predicate` over edge args), placement policies per output
+(`inline-only`, `blob-only`), retries (`max_attempts`). None have YAML syntax
+yet — see [Readiness and predicates](/docs/dev/readiness) for where they
+live in the core. The YAML surface only grows when a real workflow needs it.

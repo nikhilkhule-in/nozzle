@@ -1,0 +1,23 @@
+[project]
+name = "nozzle"
+version = "0.1.0"
+description = "Nozzle Python SDK: workflows-as-code over the Rust core"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = []
+
+[build-system]
+requires = ["maturin>=1,<2"]
+build-backend = "maturin"
+
+[tool.maturin]
+bindings = "pyo3"
+manifest-path = "Cargo.toml"
+python-source = "."
+module-name = "nozzle.nozzle_core_ext"
+features = ["pyo3/extension-module"]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]

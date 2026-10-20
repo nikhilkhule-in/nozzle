@@ -1,0 +1,98 @@
+---
+title: core::dag — Graph and Validation
+description: "The static workflow model: specs, edges with arguments, branch predicates, and the validator that returns every problem."
+---
+
+`core/src/dag.rs` defines the static shape of a workflow and everything the
+engine refuses to accept as one.
+
+## The types
+
+```rust
+pub struct TaskSpec {
+    pub name: String,
+    pub runtime: String,     // names a worker-pool kind; runner pins "shell"
+}
+
+pub struct Edge {
+    pub upstream: String,    // producer
+    pub downstream: String,  // consumer
+    pub arg: String,         // the input slot: env var name, or "_" for ordering-only
+    pub predicate: Option<Predicate>,
+}
+
+pub struct WorkflowSpec {
+    pub id: String,
+    pub language: String,
+    pub tasks: Vec<TaskSpec>,
+    pub edges: Vec<Edge>,
+}
+```
+
+`language` and `runtime` exist because the core was designed for an
+orchestration layer that might execute tasks in several backends; the local
+runner picks `language: "shell"` for every task and this note is all the
+surface a second runtime would add.
+
+## Branch predicates (core-level, not yet in YAML)
+
+```rust
+pub enum PredicateOp { Equals, NotEquals }   // serde: "equals" / "not_equals"
+
+pub struct Predicate {
+    pub op: PredicateOp,
+    pub value: serde_json::Value,            // must be a JSON scalar
+}
+```
+
+`evaluate_predicate(output, pred)` is **type-strict**: `1` never equals
+`"1"`, `true` never equals `"true"`. Comparison is the plain `serde_json::Value`
+equality, negated for `NotEquals`.
+
+Predicates are how the core expresses conditional branches (an edge whose
+upstream output doesn't match is *unsatisfiable* rather than broken — see
+[readiness](/docs/dev/readiness#the-four-readiness-states)). The YAML
+surface has no syntax for them yet; they're validated and available to
+whichever front ends arrive.
+
+## `validate()` — every problem, every time
+
+```rust
+pub fn validate(spec: &WorkflowSpec) -> Result&lt;(), Vec&lt;String&gt;&gt;
+```
+
+All checks run — no early return — and the messages are stable agreements
+that the runner test suite asserts against:
+
+| Message | Meaning |
+|---|---|
+| `workflow id must not be empty` | id w/o name |
+| `workflow language must not be empty` | language w/o words |
+| `task name must not be empty` | unnamed task |
+| `duplicate task name: a` | ids are graph keys |
+| `edge references unknown upstream/downstream: x` | dangling ends |
+| `self-edge on task: a` | a ← itself |
+| `edge a -> b needs an arg name` | empty arg |
+| `predicate on edge a -> b must be a JSON scalar` | object/array against predicate |
+| `workflow graph contains a cycle` | deadlock |
+
+## Cycle detection: Kahn's algorithm
+
+`has_cycle` (~30 lines) builds an indegree map over known task names, seeds a
+work queue with indegree-0 tasks, and "unlocks" downstreams by decrementing
+indegrees — the topological-sort peeling. The verdict is the visited count:
+
+```rust
+visited != spec.tasks.len()   // something never got unlocked ⇒ cycle
+```
+
+Two nice properties: it ignores edges to unknown endpoints *only after*
+validation flagged them (defensive against direct core-API misuse), and it is
+O(V + E), so even workflow graphs with thousands of tasks cost nothing.
+
+## What this module does **not** know
+
+Anything about commands, values, environment variables, or processes. An
+edge's `arg` is just a name; whether it's `"_"` for ordering or `"IMAGE_TAG"`
+for data flow is a convention between the [runner](/docs/dev/runner) and the
+[data module](/docs/dev/data-and-config).
