@@ -6,6 +6,8 @@ related:
   - reference/schema
 ---
 
+import { TypeTable } from 'fumadocs-ui/components/type-table';
+
 `nzl` (package `nozzle-run`) executes a YAML-defined workflow on this
 machine. All I/O lives in the CLI; scheduling decisions come from
 `nozzle-core`. This page is the exhaustive contract — for a guided tour of
@@ -18,8 +20,6 @@ usage: nzl run <workflow.yaml>
 
 ## Commands
 
-```tsx
-import { TypeTable } from 'fumadocs-ui/components/type-table';
 
 <TypeTable
   type={{
@@ -37,14 +37,12 @@ import { TypeTable } from 'fumadocs-ui/components/type-table';
     },
   }}
 />
-```
+
 
 Any other invocation prints the usage line to stderr and exits `2`.
 
 ## Exit codes
 
-```tsx
-import { TypeTable } from 'fumadocs-ui/components/type-table';
 
 <TypeTable
   type={{
@@ -64,7 +62,7 @@ import { TypeTable } from 'fumadocs-ui/components/type-table';
     },
   }}
 />
-```
+
 
 Scripts should branch on the code, not on parsing stdout.
 

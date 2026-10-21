@@ -7,6 +7,8 @@ related:
   - reference/schema
 ---
 
+import { TypeTable } from 'fumadocs-ui/components/type-table';
+
 A workflow is one YAML document: a name plus a list of shell tasks. The
 reference example, `examples/build-random-image.yaml`:
 
@@ -26,8 +28,6 @@ tasks:
 
 ## Workflow fields
 
-```tsx
-import { TypeTable } from 'fumadocs-ui/components/type-table';
 
 <TypeTable
   type={{
@@ -45,12 +45,10 @@ import { TypeTable } from 'fumadocs-ui/components/type-table';
     },
   }}
 />
-```
+
 
 ## Task fields
 
-```tsx
-import { TypeTable } from 'fumadocs-ui/components/type-table';
 
 <TypeTable
   type={{
@@ -82,7 +80,7 @@ import { TypeTable } from 'fumadocs-ui/components/type-table';
     },
   }}
 />
-```
+
 
 Two things deserve emphasis:
 
