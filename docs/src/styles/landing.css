@@ -2,11 +2,11 @@
    element selectors (h1, header, main, footer, a) leak into the docs. */
 @scope (.lp) {
 
-.lp{--bg:#1b0b0a;--fg:#fbeee8;--mu:#a69894;--ln:#3a2b29;--ln2:#574846;--acc:#ff6a3d;--acc2:#ffb454;--on:#1b0b0a;--ok:#7ad69a;--bad:#ff4d5e;--am:#ffc15a;
+:scope{--bg:#1b0b0a;--fg:#fbeee8;--mu:#a69894;--ln:#3a2b29;--ln2:#574846;--acc:#ff6a3d;--acc2:#ffb454;--on:#1b0b0a;--ok:#7ad69a;--bad:#ff4d5e;--am:#ffc15a;
 --df:var(--sans);--dw:600;--dl:-.055em;--dz:1;--r:8px;--br:8px;
 --sans:'InterVariable',ui-sans-serif,system-ui,sans-serif;--mono:'IBM Plex Mono',ui-monospace,Menlo,monospace;
 color-scheme:dark}
-.lp section[id]{scroll-margin-top:70px}
+:scope section[id]{scroll-margin-top:70px}
 :scope{background:var(--bg);color:var(--fg);font:16px/1.6 var(--sans);-webkit-font-smoothing:antialiased}
 a{color:inherit}.w{max-width:1120px;margin:0 auto;padding:0 24px}.mu{color:var(--mu)}
 header{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:color-mix(in srgb,var(--bg) 78%,transparent);backdrop-filter:blur(14px);border-bottom:1px solid var(--ln)}
