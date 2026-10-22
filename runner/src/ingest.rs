@@ -150,6 +150,13 @@ pub fn load_docker(wf: WorkflowYaml) -> Result<Loaded, Vec<String>> {
     }
 }
 
+/// Load and validate for Docker mode (adds missing-image checks).
+pub fn load_docker_file(path: &str) -> Result<Loaded, Vec<String>> {
+    let text =
+        std::fs::read_to_string(path).map_err(|e| vec![format!("cannot read {path}: {e}")])?;
+    load_docker_str(&text)
+}
+
 /// Parse YAML text and validate for Docker mode.
 pub fn load_docker_str(text: &str) -> Result<Loaded, Vec<String>> {
     let wf: WorkflowYaml =

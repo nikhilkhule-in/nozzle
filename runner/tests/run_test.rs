@@ -1,8 +1,8 @@
 //! Integration tests: execution-loop behavior against the spec scenarios.
 
 use nozzle_core::states::{RunStatus, TaskStatus};
-use nozzle_run::executor::Executor;
-use nozzle_run::ingest::load_str;
+use nozzle_run::executor::{new_run_volume, DockerExecutor, Executor, ExecutorConfig};
+use nozzle_run::ingest::{load_docker_str, load_str};
 use nozzle_run::scheduler::{self, SchedulerEvent};
 use std::process::Command;
 use std::sync::{Arc, Mutex};
@@ -197,4 +197,57 @@ fn unconsumed_oversized_output_succeeds() {
         None::<Box<dyn Executor>>,
     );
     assert_eq!(outcome.run, RunStatus::Succeeded);
+}
+
+#[test]
+fn docker_executor_runs_in_dependency_order() {
+    let loaded = load_docker_str(
+        "name: w\ntasks:\n  - id: a\n    image: python:3.12\n    cmd: echo hi\n  - id: b\n    image: python:3.12\n    cmd: echo bye\n    needs: [a]\n",
+    )
+    .unwrap();
+    let (lines, mut report) = collector();
+    let volume = new_run_volume("w-docker-order");
+    let executor = DockerExecutor::new(ExecutorConfig::default(), volume).expect("daemon required");
+    let outcome = scheduler::run(
+        &loaded.spec,
+        &loaded.tasks,
+        &mut report,
+        Some(Box::new(executor) as Box<dyn Executor>),
+    );
+    assert_eq!(outcome.run, RunStatus::Succeeded);
+    assert_eq!(
+        *lines.lock().unwrap(),
+        vec!["start a", "end a succeeded", "start b", "end b succeeded"]
+    );
+}
+
+#[test]
+fn docker_executor_blocks_downstream_but_continues_independent() {
+    let loaded = load_docker_str(
+        "name: w\ntasks:\n  - id: a\n    image: python:3.12\n    cmd: exit 3\n  - id: b\n    image: python:3.12\n    cmd: echo never\n    needs: [a]\n  - id: c\n    image: python:3.12\n    cmd: echo independent\n",
+    )
+    .unwrap();
+    let (_lines, mut report) = collector();
+    let volume = new_run_volume("w-docker-fail");
+    let executor = DockerExecutor::new(ExecutorConfig::default(), volume).expect("daemon required");
+    let outcome = scheduler::run(
+        &loaded.spec,
+        &loaded.tasks,
+        &mut report,
+        Some(Box::new(executor) as Box<dyn Executor>),
+    );
+    assert_eq!(outcome.run, RunStatus::Failed);
+    let statuses: Vec<_> = outcome
+        .tasks
+        .iter()
+        .map(|r| (r.name.as_str(), r.status))
+        .collect();
+    assert_eq!(
+        statuses,
+        vec![
+            ("a", TaskStatus::Failed),
+            ("b", TaskStatus::Failed),
+            ("c", TaskStatus::Succeeded),
+        ]
+    );
 }
