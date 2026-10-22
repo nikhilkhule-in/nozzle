@@ -15,11 +15,20 @@ cargo run -p nozzle-run -- run <workflow.yaml>
 just run-demo
 # or, once the CLI is installed (`cargo install --path runner`), by name:
 nzl run <workflow.yaml>
+# or, each task in its own container:
+nzl run --executor docker <workflow.yaml>
 ```
 
-The CLI has two subcommands: `run`, which takes a workflow file path, and
+The CLI has two subcommands: `run`, which takes a workflow file path (with optional `--executor local|docker`, default `local`), and
 `schema`, which prints the workflow JSON Schema. Anything else prints
-`usage: nzl run <workflow.yaml>` to stderr and exits `2`.
+`usage: nzl run [--executor local|docker] <workflow.yaml>` to stderr and exits `2`.
+
+## Executors
+
+- `local` (default): `sh -c '<cmd>'` on the host, inheriting ambient env plus data-flow `env` bindings. `image` is ignored.
+- `docker`: `docker run --rm --entrypoint sh -v <vol>:/work -w /work --name nozzle-<run>-<task> <image> -c '<cmd>'` per task on the Docker host. Each task needs `image:`; containers see only `passEnv` allowlist entries plus data-flow `env`. One anonymous volume per run is mounted at `/work` and removed even on failure. Daemon comes from `DOCKER_HOST` or the default socket — unreachable daemon exits `2` before any task runs.
+
+See `examples/release.yaml` for the self-CI pattern: `clone` with `alpine/git` onto `/work`, then `test`/`clippy` on `rust`, smokes on `python`/`node`, all sharing the work volume.
 
 ## Exit codes
 
@@ -27,7 +36,7 @@ The CLI has two subcommands: `run`, which takes a workflow file path, and
 |---|---|
 | `0` | Every task reached `succeeded` |
 | `1` | The run executed but ended `FAILED` (a task failed, or tasks stayed blocked) |
-| `2` | Could not run at all: usage error, unreadable file, or invalid workflow |
+| `2` | Could not run at all: usage error (including unknown executor), unreadable file, invalid workflow, missing image in Docker mode, missing `passEnv` var, or unreachable Docker daemon |
 
 Scripts should branch on the code, not on parsing stdout. The
 [CLI reference](/docs/reference/cli) is the exhaustive contract, including

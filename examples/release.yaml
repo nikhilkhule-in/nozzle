@@ -1,0 +1,25 @@
+# Nozzle self-CI (user space): clone once, build on shared /work.
+# Engine provides per-task image, implicit work volume, explicit passEnv.
+# All CI opinion (images, clone strategy, commands) lives here, not in core.
+name: release
+tasks:
+  - id: clone
+    image: alpine/git:2.45.2
+    cmd: rm -rf /work/nozzle && git clone --depth 1 "$URL" /work/nozzle && git -C /work/nozzle rev-parse --short HEAD
+    passEnv: [URL]
+  - id: test
+    image: rust:1.89
+    cmd: cd /work/nozzle && cargo test --workspace -q -- --skip docker
+    needs: [clone]
+  - id: clippy
+    image: rust:1.89
+    cmd: cd /work/nozzle && rustup component add clippy && cargo clippy --workspace --all-targets -- -D warnings
+    needs: [clone]
+  - id: python-smoke
+    image: python:3.12
+    cmd: python --version
+    needs: [clone]
+  - id: node-smoke
+    image: node:20
+    cmd: node --version
+    needs: [clone]

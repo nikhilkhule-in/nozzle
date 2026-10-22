@@ -24,7 +24,7 @@
   ],
   "$defs": {
     "TaskYaml": {
-      "description": "One task: a shell command with optional ordering (`needs`) and\ndata-flow (`env`) dependencies.",
+      "description": "One task: a shell command with optional ordering (`needs`),\ndata-flow (`env`) dependencies, container image, and explicit\nenvironment passthrough (`passEnv`).",
       "type": "object",
       "properties": {
         "cmd": {
@@ -45,8 +45,24 @@
           "type": "string",
           "pattern": "\\S"
         },
+        "image": {
+          "description": "Container image for Docker execution (e.g. `rust:1.80`). Absent\nmeans local execution; Docker mode requires it per task.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
         "needs": {
           "description": "Ordering dependencies: this task runs only after each listed task\nreaches a terminal state. Referenced ids must exist (runtime check).",
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "string"
+          }
+        },
+        "passEnv": {
+          "description": "Explicit host environment allowlist forwarded to the task container.\nMissing names fail validation before any task runs. Local execution\ninherits ambient and ignores this beyond validation.",
           "type": "array",
           "default": [],
           "items": {

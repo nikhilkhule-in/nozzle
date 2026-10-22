@@ -4,17 +4,32 @@
 //! All I/O lives here; scheduling decisions come from `nozzle-core`.
 
 use nozzle_core::states::{RunStatus, TaskStatus};
+use nozzle_run::executor::{DockerExecutor, Executor, ExecutorConfig};
 use nozzle_run::ingest;
 use nozzle_run::scheduler::{self, SchedulerEvent};
-use nozzle_run::executor::Executor;
 use std::process::ExitCode;
 
-const USAGE: &str = "usage: nzl run <workflow.yaml>\n       nzl schema";
+const USAGE: &str = "usage: nzl run [--executor local|docker] <workflow.yaml>\n       nzl schema";
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
     match args.as_slice() {
-        [cmd, path] if cmd == "run" => ExitCode::from(run_file(path)),
+        [cmd, path] if cmd == "run" => ExitCode::from(run_file(path, "local")),
+        [cmd, flag, value, path] if cmd == "run" && flag == "--executor" => {
+            if value != "local" && value != "docker" {
+                eprintln!("error: unknown executor '{value}' (expected local|docker)");
+                return ExitCode::from(2);
+            }
+            ExitCode::from(run_file(path, value))
+        }
+        [cmd, flag_eq, path] if cmd == "run" && flag_eq.starts_with("--executor=") => {
+            let value = flag_eq.trim_start_matches("--executor=").to_string();
+            if value != "local" && value != "docker" {
+                eprintln!("error: unknown executor '{value}' (expected local|docker)");
+                return ExitCode::from(2);
+            }
+            ExitCode::from(run_file(path, &value))
+        }
         [only] if only == "schema" => emit_schema(),
         _ => {
             eprintln!("{USAGE}");
@@ -40,8 +55,11 @@ fn emit_schema() -> ExitCode {
 }
 
 /// 0 = run succeeded, 1 = run failed, 2 = could not run (usage, unreadable
-/// file, invalid workflow).
-fn run_file(path: &str) -> u8 {
+/// file, invalid workflow, unreachable daemon).
+fn run_file(path: &str, executor_kind: &str) -> u8 {
+    if executor_kind == "docker" {
+        return run_file_docker(path);
+    }
     let loaded = match ingest::load_file(path) {
         Ok(loaded) => loaded,
         Err(problems) => {
@@ -53,17 +71,109 @@ fn run_file(path: &str) -> u8 {
     };
     let report = |ev: SchedulerEvent<'_>| match ev {
         SchedulerEvent::TaskStarted { name, cmd } => println!("-> {name}: sh -c '{cmd}'"),
-        SchedulerEvent::TaskFinished { name, status, elapsed, note } => {
-            let took = elapsed.map(|d| format!(" in {:.1}s", d.as_secs_f64())).unwrap_or_default();
+        SchedulerEvent::TaskFinished {
+            name,
+            status,
+            elapsed,
+            note,
+        } => {
+            let took = elapsed
+                .map(|d| format!(" in {:.1}s", d.as_secs_f64()))
+                .unwrap_or_default();
             let why = note.map(|n| format!(" ({n})")).unwrap_or_default();
             println!("<- {name}: {}{took}{why}", status_label(status));
         }
     };
-    let outcome = scheduler::run(&loaded.spec, &loaded.tasks, &mut { report }, None::<Box<dyn Executor>>);
-    println!("== run '{}' {} ==", outcome.workflow, run_label(outcome.run));
+    let outcome = scheduler::run(
+        &loaded.spec,
+        &loaded.tasks,
+        &mut { report },
+        None::<Box<dyn Executor>>,
+    );
+    println!(
+        "== run '{}' {} ==",
+        outcome.workflow,
+        run_label(outcome.run)
+    );
     for r in &outcome.tasks {
-        let took = r.elapsed.map(|d| format!(" in {:.1}s", d.as_secs_f64())).unwrap_or_default();
-        let why = r.note.as_ref().map(|n| format!(" ({n})")).unwrap_or_default();
+        let took = r
+            .elapsed
+            .map(|d| format!(" in {:.1}s", d.as_secs_f64()))
+            .unwrap_or_default();
+        let why = r
+            .note
+            .as_ref()
+            .map(|n| format!(" ({n})"))
+            .unwrap_or_default();
+        println!("   {}: {}{took}{why}", r.name, status_label(r.status));
+    }
+    match outcome.run {
+        RunStatus::Succeeded => 0,
+        _ => 1,
+    }
+}
+
+fn run_file_docker(path: &str) -> u8 {
+    let loaded = match ingest::load_docker_file(path) {
+        Ok(loaded) => loaded,
+        Err(problems) => {
+            for p in &problems {
+                eprintln!("error: {p}");
+            }
+            return 2;
+        }
+    };
+    let volume = nozzle_run::executor::new_run_volume(&loaded.spec.id);
+    let executor = match DockerExecutor::new(ExecutorConfig::default(), volume) {
+        Ok(ex) => ex,
+        Err(note) => {
+            eprintln!("error: {note}");
+            return 2;
+        }
+    };
+    let report = |ev: SchedulerEvent<'_>| match ev {
+        SchedulerEvent::TaskStarted { name, cmd } => {
+            let image = loaded
+                .tasks
+                .get(name)
+                .and_then(|t| t.image.as_deref())
+                .unwrap_or("?");
+            println!("-> {name}: docker run {image} sh -c '{cmd}'")
+        }
+        SchedulerEvent::TaskFinished {
+            name,
+            status,
+            elapsed,
+            note,
+        } => {
+            let took = elapsed
+                .map(|d| format!(" in {:.1}s", d.as_secs_f64()))
+                .unwrap_or_default();
+            let why = note.map(|n| format!(" ({n})")).unwrap_or_default();
+            println!("<- {name}: {}{took}{why}", status_label(status));
+        }
+    };
+    let outcome = scheduler::run(
+        &loaded.spec,
+        &loaded.tasks,
+        &mut { report },
+        Some(Box::new(executor) as Box<dyn Executor>),
+    );
+    println!(
+        "== run '{}' {} ==",
+        outcome.workflow,
+        run_label(outcome.run)
+    );
+    for r in &outcome.tasks {
+        let took = r
+            .elapsed
+            .map(|d| format!(" in {:.1}s", d.as_secs_f64()))
+            .unwrap_or_default();
+        let why = r
+            .note
+            .as_ref()
+            .map(|n| format!(" ({n})"))
+            .unwrap_or_default();
         println!("   {}: {}{took}{why}", r.name, status_label(r.status));
     }
     match outcome.run {

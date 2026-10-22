@@ -14,7 +14,7 @@ machine. All I/O lives in the CLI; scheduling decisions come from
 invocation and output, see [Running](/docs/guide/running).
 
 ```text
-usage: nzl run <workflow.yaml>
+usage: nzl run [--executor local|docker] <workflow.yaml>
        nzl schema
 ```
 
@@ -23,10 +23,10 @@ usage: nzl run <workflow.yaml>
 
 <TypeTable
   type={{
-    "nzl run <workflow.yaml>": {
+    "nzl run [--executor local|docker] <workflow.yaml>": {
       type: "subcommand",
       description:
-        "Load, validate, and execute the workflow. Prints a lifecycle line per task and a closing summary. Returns 0 only if every task succeeded.",
+        "Load, validate, and execute the workflow. Default executor is local (sh -c on host). --executor docker runs each task in its own container on the Docker host. Prints a lifecycle line per task and a closing summary. Returns 0 only if every task succeeded.",
       default: false,
     },
     "nzl schema": {
@@ -58,7 +58,7 @@ Any other invocation prints the usage line to stderr and exits `2`.
     "2": {
       type: "exit code",
       description:
-        "Could not run at all: usage error, unreadable file, or invalid workflow (all validation problems are listed on stderr).",
+        "Could not run at all: usage error (including unknown --executor), unreadable file, invalid workflow (all validation problems are listed on stderr), missing image in Docker mode, or unreachable Docker daemon.",
     },
   }}
 />
@@ -76,12 +76,13 @@ Scripts should branch on the code, not on parsing stdout.
    build: succeeded in 1.4s (exit status 1)          # note, if any
 ```
 
-- `->` lines echo the command exactly as written in the YAML.
+- `->` lines echo the command exactly as written in the YAML. In Docker mode they read `docker run <image> sh -c '…'`; in local mode `sh -c '…'`.
 - `<-` lines carry the terminal status, the elapsed span, and an optional
-  note — e.g. `exit status 1`, `cannot spawn: …`, or the placement error for
+  note — e.g. `exit status 1`, `cannot spawn: …`, `docker daemon unreachable: …`, or the placement error for
   oversized outputs.
 - A task's **stderr is inherited**, so long-running commands (docker build)
   stream progress live; only stdout is captured for data flow.
+- Docker mode resolves the daemon from `DOCKER_HOST` or the default socket, creates one anonymous volume per run at `/work` (workdir `/work`, removed even on failure), and exposes only `passEnv` plus data-flow `env` — never full host ambient.
 
 ## Recipes
 
@@ -89,9 +90,13 @@ Scripts should branch on the code, not on parsing stdout.
 # run with cargo, no install
 cargo run -p nozzle-run -- run examples/build-random-image.yaml
 
+# run each task in its own container (per-task image, shared /work)
+URL=https://github.com/n-khule/nozzle.git cargo run -p nozzle-run -- run --executor docker examples/release.yaml
+
 # install once, then use by name
 cargo install --path runner
 nzl run workflow.yaml
+nzl run --executor docker workflow.yaml
 
 # wire editor completion for workflow files
 nzl schema > schemas/workflow.schema.json

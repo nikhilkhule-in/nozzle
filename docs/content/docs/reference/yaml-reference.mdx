@@ -78,8 +78,40 @@ tasks:
         'Data dependencies: each entry declares `VAR` bound from an upstream task\'s captured stdout, **and** implies a dependency on it.',
       default: '{}',
     },
+    image: {
+      type: 'string',
+      required: false,
+      description:
+        'Container image for Docker execution (e.g. `rust:1.80`). Absent means local execution; Docker mode requires it per task.',
+      default: 'null',
+    },
+    passEnv: {
+      type: 'list of names',
+      required: false,
+      description:
+        'Explicit host env allowlist forwarded to the task. Missing names fail validation before any task runs. Local inherits ambient beyond this; Docker exposes only `passEnv` plus data-flow `env`.',
+      default: '[]',
+    },
   }}
 />
+
+
+Local vs Docker execution:
+
+| Field | Local (`--executor local`) | Docker (`--executor docker`) |
+|---|---|---|
+| `image` | ignored, may be absent | required per task, no default |
+| `passEnv` | validated (missing fails), otherwise ambient inherited | validated and enforced: only `passEnv` + data-flow `env` visible |
+| `cmd` | `sh -c` on host | `sh -c` in container, workdir `/work` |
+
+```yaml
+name: docker-demo
+tasks:
+  - id: build
+    image: rust:1.80
+    cmd: cargo test --workspace
+    passEnv: [CI]
+```
 
 
 Two things deserve emphasis:
