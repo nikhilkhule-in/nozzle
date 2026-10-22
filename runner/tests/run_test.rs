@@ -175,6 +175,10 @@ fn help_flags_print_and_exit_zero_without_executing() {
         let stdout = String::from_utf8_lossy(&out.stdout);
         assert!(stdout.contains("usage:"), "{args:?}");
     }
+    // Bare `nzl` prints the help page like `--help`.
+    let out = Command::new(bin).output().unwrap();
+    assert!(out.status.success());
+    assert!(String::from_utf8_lossy(&out.stdout).contains("usage:"));
     // run --help must not read or execute any workflow file.
     let out = Command::new(bin)
         .args(["run", "--help", "/nonexistent-workflow.yaml"])

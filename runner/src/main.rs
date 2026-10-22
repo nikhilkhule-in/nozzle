@@ -74,6 +74,10 @@ fn print_usage_error_and_exit(hint: &str) -> ExitCode {
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
+    // Bare `nzl` prints the help page like `nzl --help`.
+    if args.is_empty() {
+        return print_help_and_exit(GLOBAL_HELP);
+    }
     // Global help first: nzl --help | -h (anywhere in first position),
     // nzl help [subcommand].
     if let Some(first) = args.first() {

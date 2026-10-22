@@ -15,6 +15,11 @@ The system SHALL support `nzl --help`, `nzl -h`, and `nzl help` printing the glo
 - **WHEN** a user runs `nzl --help`
 - **THEN** global usage plus `run` and `schema` summaries print to stdout and the process exits 0
 
+#### Scenario: Bare invocation prints help
+
+- **WHEN** a user runs `nzl` with no arguments
+- **THEN** the global help prints to stdout and the process exits 0
+
 #### Scenario: Per-subcommand help
 
 - **WHEN** a user runs `nzl help run`
