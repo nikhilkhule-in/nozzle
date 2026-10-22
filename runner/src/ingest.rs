@@ -17,6 +17,10 @@ pub struct TaskDef {
     pub cmd: String,
     /// Env variable name -> upstream task id.
     pub env: BTreeMap<String, String>,
+    /// Container image for Docker execution; None means local only.
+    pub image: Option<String>,
+    /// Explicit host env allowlist (Docker) / validated names (local).
+    pub pass_env: Vec<String>,
 }
 
 #[derive(Debug)]
@@ -39,6 +43,10 @@ pub fn load_str(text: &str) -> Result<Loaded, Vec<String>> {
 
 /// Convert and validate, collecting every problem in one pass: YAML-level
 /// problems plus the core's full problem list from `dag::validate`.
+///
+/// `passEnv` names are validated against the host environment here for both
+/// executors (fail-closed); Docker image presence is checked separately in
+/// `docker_problems` / `load_docker` so local workflows stay imageless.
 pub fn load(wf: WorkflowYaml) -> Result<Loaded, Vec<String>> {
     let mut problems = Vec::new();
     if wf.name.trim().is_empty() {
@@ -56,8 +64,24 @@ pub fn load(wf: WorkflowYaml) -> Result<Loaded, Vec<String>> {
         if t.cmd.trim().is_empty() {
             problems.push(format!("task {} declares an empty cmd", t.id));
         }
-        spec_tasks.push(TaskSpec { name: t.id.clone(), runtime: "shell".to_string() });
-        table.insert(t.id.clone(), TaskDef { cmd: t.cmd.clone(), env: t.env.clone() });
+        for var in &t.pass_env {
+            if std::env::var_os(var).is_none() {
+                problems.push(format!("task {} lists missing host env var {var}", t.id));
+            }
+        }
+        spec_tasks.push(TaskSpec {
+            name: t.id.clone(),
+            runtime: "shell".to_string(),
+        });
+        table.insert(
+            t.id.clone(),
+            TaskDef {
+                cmd: t.cmd.clone(),
+                env: t.env.clone(),
+                image: t.image.clone(),
+                pass_env: t.pass_env.clone(),
+            },
+        );
     }
     let mut edges = Vec::new();
     for t in &wf.tasks {
@@ -92,6 +116,45 @@ pub fn load(wf: WorkflowYaml) -> Result<Loaded, Vec<String>> {
     } else {
         Err(problems)
     }
+}
+
+/// Docker-only problems: every task must declare `image`. Aggregated with
+/// `load` errors by `load_docker` so one run reports everything.
+pub fn docker_problems(wf: &WorkflowYaml) -> Vec<String> {
+    let mut problems = Vec::new();
+    for t in &wf.tasks {
+        match &t.image {
+            Some(img) if !img.trim().is_empty() => {}
+            _ => problems.push(format!("task {} declares no image", t.id)),
+        }
+    }
+    problems
+}
+
+/// Load plus Docker requirements: `load` errors plus missing `image` per
+/// task, in one pass, before any task runs.
+pub fn load_docker(wf: WorkflowYaml) -> Result<Loaded, Vec<String>> {
+    let extra = docker_problems(&wf);
+    match load(wf) {
+        Ok(loaded) => {
+            if extra.is_empty() {
+                Ok(loaded)
+            } else {
+                Err(extra)
+            }
+        }
+        Err(mut problems) => {
+            problems.extend(extra);
+            Err(problems)
+        }
+    }
+}
+
+/// Parse YAML text and validate for Docker mode.
+pub fn load_docker_str(text: &str) -> Result<Loaded, Vec<String>> {
+    let wf: WorkflowYaml =
+        serde_yaml::from_str(text).map_err(|e| vec![format!("invalid workflow yaml: {e}")])?;
+    load_docker(wf)
 }
 
 #[cfg(test)]
@@ -140,19 +203,28 @@ tasks:
         assert_eq!(flow.len(), 1);
         assert_eq!(flow[0].upstream, "a");
         assert_eq!(loaded.tasks["a"].cmd, "echo a");
-        assert_eq!(loaded.tasks["b"].env.get("TAG").map(String::as_str), Some("a"));
+        assert_eq!(
+            loaded.tasks["b"].env.get("TAG").map(String::as_str),
+            Some("a")
+        );
     }
 
     #[test]
     fn unknown_dependency_is_reported() {
         let errs = problems("name: w\ntasks:\n  - id: a\n    cmd: exit 0\n    needs: [ghost]\n");
-        assert!(errs.iter().any(|e| e.contains("unknown upstream")), "{errs:?}");
+        assert!(
+            errs.iter().any(|e| e.contains("unknown upstream")),
+            "{errs:?}"
+        );
     }
 
     #[test]
     fn env_binding_unknown_upstream_is_reported() {
         let errs = problems("name: w\ntasks:\n  - id: a\n    cmd: exit 0\n    env: { V: ghost }\n");
-        assert!(errs.iter().any(|e| e.contains("unknown upstream")), "{errs:?}");
+        assert!(
+            errs.iter().any(|e| e.contains("unknown upstream")),
+            "{errs:?}"
+        );
     }
 
     #[test]
@@ -166,14 +238,18 @@ tasks:
 
     #[test]
     fn duplicate_ids_are_reported() {
-        let errs = problems("name: w\ntasks:\n  - id: a\n    cmd: exit 0\n  - id: a\n    cmd: exit 0\n");
+        let errs =
+            problems("name: w\ntasks:\n  - id: a\n    cmd: exit 0\n  - id: a\n    cmd: exit 0\n");
         assert!(errs.iter().any(|e| e.contains("duplicate")), "{errs:?}");
     }
 
     #[test]
     fn empty_fields_are_reported() {
         let errs = problems("name: \"\"\ntasks:\n  - id: a\n    cmd: \"\"\n");
-        assert!(errs.iter().any(|e| e.contains("name must not be empty")), "{errs:?}");
+        assert!(
+            errs.iter().any(|e| e.contains("name must not be empty")),
+            "{errs:?}"
+        );
         assert!(errs.iter().any(|e| e.contains("empty cmd")), "{errs:?}");
     }
 
@@ -181,5 +257,70 @@ tasks:
     fn taskless_workflow_is_reported() {
         let errs = problems("name: w\ntasks: []\n");
         assert!(errs.iter().any(|e| e.contains("no tasks")), "{errs:?}");
+    }
+
+    #[test]
+    fn image_and_passenv_parse_and_retain() {
+        let loaded = load_str(
+            "name: w\ntasks:\n  - id: a\n    cmd: exit 0\n    image: rust:1.80\n    passEnv: [PATH]\n",
+        )
+        .unwrap();
+        assert_eq!(loaded.tasks["a"].image.as_deref(), Some("rust:1.80"));
+        assert_eq!(loaded.tasks["a"].pass_env, vec!["PATH".to_string()]);
+    }
+
+    #[test]
+    fn local_allows_missing_image() {
+        let loaded = load_str("name: w\ntasks:\n  - id: a\n    cmd: exit 0\n").unwrap();
+        assert!(loaded.tasks["a"].image.is_none());
+    }
+
+    #[test]
+    fn docker_requires_image_per_task() {
+        let errs = load_docker_str("name: w\ntasks:\n  - id: a\n    cmd: exit 0\n").unwrap_err();
+        assert!(
+            errs.iter().any(|e| e.contains("declares no image")),
+            "{errs:?}"
+        );
+    }
+
+    #[test]
+    fn docker_accepts_image_and_existing_passenv() {
+        let loaded = load_docker_str(
+            "name: w\ntasks:\n  - id: a\n    cmd: exit 0\n    image: rust:1.80\n    passEnv: [PATH]\n",
+        )
+        .unwrap();
+        assert_eq!(loaded.tasks["a"].image.as_deref(), Some("rust:1.80"));
+    }
+
+    #[test]
+    fn missing_passenv_is_reported() {
+        let errs = problems(
+            "name: w\ntasks:\n  - id: a\n    cmd: exit 0\n    passEnv: [NOZZLE_TEST_MISSING_VAR_XYZ]\n",
+        );
+        assert!(
+            errs.iter().any(|e| e.contains("missing host env var")),
+            "{errs:?}"
+        );
+    }
+
+    #[test]
+    fn docker_aggregates_all_problems() {
+        let errs = load_docker_str(
+            "name: w\ntasks:\n  - id: a\n    cmd: exit 0\n    needs: [ghost]\n    passEnv: [NOZZLE_TEST_MISSING_VAR_XYZ]\n",
+        )
+        .unwrap_err();
+        assert!(
+            errs.iter().any(|e| e.contains("unknown upstream")),
+            "{errs:?}"
+        );
+        assert!(
+            errs.iter().any(|e| e.contains("declares no image")),
+            "{errs:?}"
+        );
+        assert!(
+            errs.iter().any(|e| e.contains("missing host env var")),
+            "{errs:?}"
+        );
     }
 }

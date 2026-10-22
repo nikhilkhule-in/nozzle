@@ -24,8 +24,9 @@ pub struct WorkflowYaml {
     pub tasks: Vec<TaskYaml>,
 }
 
-/// One task: a shell command with optional ordering (`needs`) and
-/// data-flow (`env`) dependencies.
+/// One task: a shell command with optional ordering (`needs`),
+/// data-flow (`env`) dependencies, container image, and explicit
+/// environment passthrough (`passEnv`).
 #[derive(Debug, Deserialize, JsonSchema)]
 pub struct TaskYaml {
     /// Unique task identifier. Uniqueness (like all cross-references between
@@ -46,6 +47,15 @@ pub struct TaskYaml {
     /// this task's environment and implies a dependency on it.
     #[serde(default)]
     pub env: BTreeMap<String, String>,
+    /// Container image for Docker execution (e.g. `rust:1.80`). Absent
+    /// means local execution; Docker mode requires it per task.
+    #[serde(default)]
+    pub image: Option<String>,
+    /// Explicit host environment allowlist forwarded to the task container.
+    /// Missing names fail validation before any task runs. Local execution
+    /// inherits ambient and ignores this beyond validation.
+    #[serde(default, rename = "passEnv")]
+    pub pass_env: Vec<String>,
 }
 
 #[cfg(test)]
@@ -72,7 +82,10 @@ tasks:
         assert!(wf.tasks[0].needs.is_empty());
         assert!(wf.tasks[0].env.is_empty());
         assert_eq!(wf.tasks[1].needs, vec!["gen-tag".to_string()]);
-        assert_eq!(wf.tasks[1].env.get("IMAGE_TAG").map(String::as_str), Some("gen-tag"));
+        assert_eq!(
+            wf.tasks[1].env.get("IMAGE_TAG").map(String::as_str),
+            Some("gen-tag")
+        );
     }
 
     #[test]
