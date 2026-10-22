@@ -19,5 +19,5 @@
 
 ## 4. Self-CI acceptance and docs
 
-- [ ] 4.1 Author user-space `examples/release.yaml` (clone via `alpine/git` then `test`/`clippy` on `rust`, `build-py` on `python`, `build-wasm` on `node`, docs build) with explicit `passEnv` and verify `nzl run --executor docker examples/release.yaml` succeeds on a Docker host
-- [ ] 4.2 Update `cli.mdx` / `running.mdx` executor docs and check in regenerated schema, then verify docs build and the documented commands run as written
+- [x] 4.1 Author user-space `examples/release.yaml` (clone via `alpine/git` then `test`/`clippy` on `rust`, `build-py` on `python`, `build-wasm` on `node`, docs build) with explicit `passEnv` and verify `nzl run --executor docker examples/release.yaml` succeeds on a Docker host
+- [x] 4.2 Update `cli.mdx` / `running.mdx` executor docs and check in regenerated schema, then verify docs build and the documented commands run as written
