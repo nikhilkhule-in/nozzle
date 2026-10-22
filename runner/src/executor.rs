@@ -248,6 +248,8 @@ impl DockerExecutor {
         let mut args: Vec<String> = vec![
             "run".into(),
             "--rm".into(),
+            "--entrypoint".into(),
+            self.config.shell.clone(),
             "-v".into(),
             format!("{}:/work", self.volume),
             "-w".into(),
@@ -273,7 +275,6 @@ impl DockerExecutor {
             args.push(format!("{var}={value}"));
         }
         args.push(image);
-        args.push(self.config.shell.clone());
         args.push(self.config.shell_flag.clone());
         args.push(def.cmd.clone());
         Ok(args)
@@ -363,6 +364,7 @@ mod tests {
             .unwrap();
         assert!(args.contains(&"run".to_string()));
         assert!(args.contains(&"--rm".to_string()));
+        assert!(args.contains(&"--entrypoint".to_string()));
         assert!(args.contains(&"nozzle-test-vol:/work".to_string()));
         assert!(args.contains(&"/work".to_string()));
         assert!(args.contains(&"nozzle-test-vol-a".to_string()));
@@ -370,9 +372,12 @@ mod tests {
         assert!(args
             .windows(2)
             .any(|w| w[0] == "-e" && w[1].starts_with("PATH=")));
+        assert!(args
+            .windows(2)
+            .any(|w| w[0] == "--entrypoint" && w[1] == "sh"));
         assert_eq!(
-            args[args.len() - 3..],
-            ["sh".to_string(), "-c".to_string(), "echo hi".to_string()]
+            args[args.len() - 2..],
+            ["-c".to_string(), "echo hi".to_string()]
         );
     }
 
