@@ -159,6 +159,53 @@ fn binary_exit_code_and_summary_reflect_the_run() {
 }
 
 #[test]
+fn help_flags_print_and_exit_zero_without_executing() {
+    let bin = env!("CARGO_BIN_EXE_nzl");
+    for args in [
+        vec!["--help"],
+        vec!["-h"],
+        vec!["help"],
+        vec!["help", "run"],
+        vec!["help", "schema"],
+        vec!["run", "--help"],
+        vec!["schema", "--help"],
+    ] {
+        let out = Command::new(bin).args(&args).output().unwrap();
+        assert!(out.status.success(), "{args:?}");
+        let stdout = String::from_utf8_lossy(&out.stdout);
+        assert!(stdout.contains("usage:"), "{args:?}");
+    }
+    // run --help must not read or execute any workflow file.
+    let out = Command::new(bin)
+        .args(["run", "--help", "/nonexistent-workflow.yaml"])
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+}
+
+#[test]
+fn usage_errors_exit_two_with_hint() {
+    let bin = env!("CARGO_BIN_EXE_nzl");
+    for args in [
+        vec!["run"],
+        vec![
+            "run",
+            "--executor",
+            "bogus",
+            "examples/build-random-image.yaml",
+        ],
+        vec!["help", "bogus"],
+        vec!["frobnicate"],
+    ] {
+        let out = Command::new(bin).args(&args).output().unwrap();
+        assert!(!out.status.success(), "{args:?}");
+        assert_eq!(out.status.code(), Some(2), "{args:?}");
+        let stderr = String::from_utf8_lossy(&out.stderr);
+        assert!(stderr.contains("Try 'nzl help"), "{args:?}: {stderr}");
+    }
+}
+
+#[test]
 fn maps_name_tasks_and_edges() {
     let loaded = load_str(
         "name: my-workflow\ntasks:\n  - id: task-a\n    cmd: echo hi\n  - id: task-b\n    cmd: echo bye\n    needs: [task-a]\n",

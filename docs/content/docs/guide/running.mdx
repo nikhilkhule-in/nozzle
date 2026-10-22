@@ -19,9 +19,10 @@ nzl run <workflow.yaml>
 nzl run --executor docker <workflow.yaml>
 ```
 
-The CLI has two subcommands: `run`, which takes a workflow file path (with optional `--executor local|docker`, default `local`), and
-`schema`, which prints the workflow JSON Schema. Anything else prints
-`usage: nzl run [--executor local|docker] <workflow.yaml>` to stderr and exits `2`.
+The CLI has two subcommands plus help: `run`, which takes a workflow file path (with optional `--executor local|docker`, default `local`),
+`schema`, which prints the workflow JSON Schema, and `help [subcommand]`. `nzl --help`, `nzl -h`, `nzl help`, `nzl run --help`, and
+`nzl schema --help` print to stdout and exit `0`. Anything else prints
+`usage: nzl [--help] <subcommand> [args]` to stderr and exits `2`.
 
 ## Executors
 

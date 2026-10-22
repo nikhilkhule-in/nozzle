@@ -9,32 +9,127 @@ use nozzle_run::ingest;
 use nozzle_run::scheduler::{self, SchedulerEvent};
 use std::process::ExitCode;
 
-const USAGE: &str = "usage: nzl run [--executor local|docker] <workflow.yaml>\n       nzl schema";
+const USAGE: &str = "usage: nzl [--help] <subcommand> [args]\n       nzl run [--executor local|docker] <workflow.yaml>\n       nzl schema";
+
+const GLOBAL_HELP: &str = "\
+nzl - workflows-as-code scheduling engine
+
+usage: nzl [--help] <subcommand> [args]
+
+Subcommands:
+  run       Load, validate, and execute a workflow
+  schema    Print the workflow JSON Schema to stdout
+  help      Show help (nzl help [subcommand])
+
+Global flags:
+  -h, --help    Show this help (exit 0)
+
+Try 'nzl help <subcommand>' for subcommand details.";
+
+const RUN_HELP: &str = "\
+nzl run - execute a workflow
+
+usage: nzl run [--executor local|docker] <workflow.yaml>
+       nzl run [--executor=<local|docker>] <workflow.yaml>
+       nzl run --help
+
+Local args:
+  <workflow.yaml>           Path to a .yaml/.yml/.json workflow file (required)
+  --executor local|docker   Execution backend (default: local)
+  --executor=<local|docker> Same, equals form
+  -h, --help                Show this help (exit 0, runs nothing)
+
+Executors:
+  local    sh -c '<cmd>' on the host (image ignored)
+  docker   one 'docker run --rm' container per task (image required per task)
+
+Exit codes:
+  0  every task succeeded
+  1  run executed but ended FAILED
+  2  usage error, unreadable file, invalid workflow, or unreachable daemon
+
+Examples:
+  nzl run workflow.yaml
+  nzl run --executor docker examples/release.yaml";
+
+const SCHEMA_HELP: &str = "\
+nzl schema - print the workflow JSON Schema
+
+usage: nzl schema
+       nzl schema --help
+
+No arguments. Prints the JSON Schema (draft 2020-12) generated from the
+loader types to stdout. Exit 0 on success.";
+
+fn print_help_and_exit(text: &str) -> ExitCode {
+    println!("{text}");
+    ExitCode::SUCCESS
+}
+
+fn print_usage_error_and_exit(hint: &str) -> ExitCode {
+    eprintln!("{USAGE}");
+    eprintln!("{hint}");
+    ExitCode::from(2)
+}
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
+    // Global help first: nzl --help | -h (anywhere in first position),
+    // nzl help [subcommand].
+    if let Some(first) = args.first() {
+        if first == "--help" || first == "-h" {
+            return print_help_and_exit(GLOBAL_HELP);
+        }
+        if first == "help" {
+            match args.get(1).map(String::as_str) {
+                None => return print_help_and_exit(GLOBAL_HELP),
+                Some("run") => return print_help_and_exit(RUN_HELP),
+                Some("schema") => return print_help_and_exit(SCHEMA_HELP),
+                Some(other) => {
+                    eprintln!("error: unknown help topic '{other}' (expected run|schema)");
+                    eprintln!("Try 'nzl help' for the topic list.");
+                    return ExitCode::from(2);
+                }
+            }
+        }
+    }
     match args.as_slice() {
-        [cmd, path] if cmd == "run" => ExitCode::from(run_file(path, "local")),
-        [cmd, flag, value, path] if cmd == "run" && flag == "--executor" => {
-            if value != "local" && value != "docker" {
-                eprintln!("error: unknown executor '{value}' (expected local|docker)");
-                return ExitCode::from(2);
+        [cmd, rest @ ..] if cmd == "run" => {
+            if rest.iter().any(|a| a == "--help" || a == "-h") {
+                return print_help_and_exit(RUN_HELP);
             }
-            ExitCode::from(run_file(path, value))
-        }
-        [cmd, flag_eq, path] if cmd == "run" && flag_eq.starts_with("--executor=") => {
-            let value = flag_eq.trim_start_matches("--executor=").to_string();
-            if value != "local" && value != "docker" {
-                eprintln!("error: unknown executor '{value}' (expected local|docker)");
-                return ExitCode::from(2);
+            match rest {
+                [path] => ExitCode::from(run_file(path, "local")),
+                [flag, value, path] if flag == "--executor" => {
+                    if value != "local" && value != "docker" {
+                        eprintln!("error: unknown executor '{value}' (expected local|docker)");
+                        eprintln!("Try 'nzl help run' for usage.");
+                        return ExitCode::from(2);
+                    }
+                    ExitCode::from(run_file(path, value))
+                }
+                [flag_eq, path] if flag_eq.starts_with("--executor=") => {
+                    let value = flag_eq.trim_start_matches("--executor=").to_string();
+                    if value != "local" && value != "docker" {
+                        eprintln!("error: unknown executor '{value}' (expected local|docker)");
+                        eprintln!("Try 'nzl help run' for usage.");
+                        return ExitCode::from(2);
+                    }
+                    ExitCode::from(run_file(path, &value))
+                }
+                _ => print_usage_error_and_exit("Try 'nzl help run' for usage."),
             }
-            ExitCode::from(run_file(path, &value))
         }
-        [only] if only == "schema" => emit_schema(),
-        _ => {
-            eprintln!("{USAGE}");
-            ExitCode::from(2)
+        [cmd, rest @ ..] if cmd == "schema" => {
+            if rest.iter().any(|a| a == "--help" || a == "-h") {
+                return print_help_and_exit(SCHEMA_HELP);
+            }
+            match rest {
+                [] => emit_schema(),
+                _ => print_usage_error_and_exit("Try 'nzl help schema' for usage."),
+            }
         }
+        _ => print_usage_error_and_exit("Try 'nzl help' for the subcommand list."),
     }
 }
 
